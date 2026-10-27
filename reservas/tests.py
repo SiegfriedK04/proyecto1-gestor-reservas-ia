@@ -497,6 +497,43 @@ class WaitlistTests(TestCase):
             "end_time": self.end.isoformat(),
         }
 
+    def test_recurring_booking_is_atomic_when_later_week_has_waitlist_priority(self):
+        self.booking.delete()
+        WaitlistEntry.objects.create(
+            user=self.first,
+            resource=self.resource,
+            start_time=self.start,
+            end_time=self.end,
+            status=WaitlistEntry.Status.NOTIFIED,
+            notified_at=timezone.now(),
+        )
+        WaitlistEntry.objects.create(
+            user=self.second,
+            resource=self.resource,
+            start_time=self.start + timedelta(weeks=1),
+            end_time=self.end + timedelta(weeks=1),
+            status=WaitlistEntry.Status.NOTIFIED,
+            notified_at=timezone.now(),
+        )
+        self.client.login(username="primero", password="segura-456")
+
+        response = self.client.post(
+            reverse("api_crear_reserva"),
+            data={**self.payload(), "repeat_weeks": 1},
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 409)
+        self.assertFalse(Booking.objects.exists())
+        self.assertEqual(
+            WaitlistEntry.objects.get(user=self.first).status,
+            WaitlistEntry.Status.NOTIFIED,
+        )
+        self.assertEqual(
+            WaitlistEntry.objects.get(user=self.second).status,
+            WaitlistEntry.Status.NOTIFIED,
+        )
+
     def join_as(self, username, password):
         self.client.login(username=username, password=password)
         response = self.client.post(
