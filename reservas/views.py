@@ -9,9 +9,12 @@ from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.contrib.admin.views.decorators import staff_member_required
+from django.db import transaction
+from django.utils import timezone
+from django.views.decorators.http import require_POST
 from .demand import build_demand_forecast
 from .forms import UserProfileForm
-from .models import Availability, Booking, Resource, UserProfile
+from .models import Availability, Booking, BookingCancellation, Resource, UserProfile
 
 
 # Horario por defecto (si no hay Availability definida)
@@ -229,6 +232,43 @@ def demand_forecast(request):
         for resource in report["resources"]
     ]
     return render(request, "reservas/demand_forecast.html", report)
+
+
+@login_required
+def my_bookings(request):
+    """Lista las reservas del usuario sin exponer las de otras cuentas."""
+    now = timezone.now()
+    bookings = Booking.objects.filter(user=request.user).select_related("resource")
+    return render(request, "reservas/my_bookings.html", {
+        "upcoming_bookings": bookings.filter(start_time__gt=now).order_by("start_time"),
+        "past_bookings": bookings.filter(start_time__lte=now).order_by("-start_time")[:10],
+        "cancellation_deadline": now + timedelta(hours=24),
+    })
+
+
+@login_required
+@require_POST
+def cancel_booking(request, booking_id):
+    """Cancela una reserva propia si faltan al menos 24 horas para su inicio."""
+    booking = get_object_or_404(
+        Booking.objects.select_related("resource"),
+        id=booking_id,
+        user=request.user,
+    )
+    if booking.start_time < timezone.now() + timedelta(hours=24):
+        messages.error(request, "La reserva solo puede cancelarse con al menos 24 horas de anticipación.")
+        return redirect("my_bookings")
+
+    with transaction.atomic():
+        BookingCancellation.objects.create(
+            user=request.user,
+            resource_name=booking.resource.name,
+            start_time=booking.start_time,
+            end_time=booking.end_time,
+        )
+        booking.delete()
+    messages.success(request, "La reserva fue cancelada correctamente.")
+    return redirect("my_bookings")
 
 def api_reservas(request, resource_id):
     """

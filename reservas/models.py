@@ -70,3 +70,19 @@ class Booking(models.Model):
 
     class Meta:
         unique_together = ('resource', 'start_time', 'end_time')
+
+
+class BookingCancellation(models.Model):
+    """Registro de auditoría conservado después de eliminar una reserva."""
+
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="booking_cancellations")
+    resource_name = models.CharField(max_length=100)
+    start_time = models.DateTimeField()
+    end_time = models.DateTimeField()
+    cancelled_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ("-cancelled_at",)
+
+    def __str__(self):
+        return f"Cancelación de {self.resource_name} por {self.user.username}"

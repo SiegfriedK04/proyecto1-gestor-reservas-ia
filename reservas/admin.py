@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Availability, Booking, Resource, UserProfile
+from .models import Availability, Booking, BookingCancellation, Resource, UserProfile
 
 # --- CONFIGURACIÓN DEL PANEL ADMIN ---
 
@@ -30,3 +30,20 @@ class UserProfileAdmin(admin.ModelAdmin):
     list_display = ("user", "phone", "preferred_resource", "default_repeat_weeks")
     search_fields = ("user__username", "user__first_name", "user__last_name", "phone")
     list_filter = ("preferred_resource",)
+
+
+@admin.register(BookingCancellation)
+class BookingCancellationAdmin(admin.ModelAdmin):
+    list_display = ("user", "resource_name", "start_time", "cancelled_at")
+    list_filter = ("resource_name", "cancelled_at")
+    search_fields = ("user__username", "resource_name")
+    readonly_fields = ("user", "resource_name", "start_time", "end_time", "cancelled_at")
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
