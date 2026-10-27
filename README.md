@@ -55,17 +55,29 @@ source .venv/bin/activate  # En Linux/Mac
 .venv\Scripts\activate     # En Windows
 
 3. Instalar dependencias
+
+```text
 pip install -r requirements.txt
+```
 
 4. Migrar la base de datos
-python manage.py makemigrations
+
+```text
 python manage.py migrate
+```
 
-6. Crear un superusuario (para acceder al panel admin)
+5. Crear un superusuario (para acceder al panel admin)
+
+```text
 python manage.py createsuperuser
+```
 
-8. Ejecutar el servidor
+6. Ejecutar las pruebas y el servidor
+
+```text
+python manage.py test
 python manage.py runserver
+```
 Accede en tu navegador a http://127.0.0.1:8000/
 
 Uso de la aplicación
