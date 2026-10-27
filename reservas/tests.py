@@ -1,4 +1,4 @@
-from datetime import timedelta
+from datetime import datetime, time, timedelta
 
 from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
@@ -7,6 +7,7 @@ from django.urls import reverse
 from django.utils import timezone
 
 from .models import Booking, Resource, UserProfile
+from .demand import build_demand_forecast
 
 
 class ReservationBaselineTests(TestCase):
@@ -123,3 +124,64 @@ class UserProfileTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'data-default-repeat-weeks="4"')
+
+
+class DemandForecastTests(TestCase):
+    def setUp(self):
+        self.admin = User.objects.create_user(
+            username="gabriel",
+            password="segura-789",
+            is_staff=True,
+        )
+        self.customer = User.objects.create_user(username="cliente", password="segura-123")
+        self.resource = Resource.objects.create(name="Sala Ejecutiva")
+
+    def create_booking(self, weeks_ago, weekday=0):
+        current_week = timezone.localdate() - timedelta(days=timezone.localdate().weekday())
+        booking_day = current_week - timedelta(weeks=weeks_ago) + timedelta(days=weekday)
+        start = timezone.make_aware(datetime.combine(booking_day, time(10, 0)))
+        return Booking.objects.create(
+            user=self.customer,
+            resource=self.resource,
+            start_time=start,
+            end_time=start + timedelta(hours=1),
+        )
+
+    def test_forecast_uses_last_four_complete_weeks(self):
+        self.create_booking(1)
+        self.create_booking(2)
+        self.create_booking(2, weekday=1)
+        self.create_booking(4)
+
+        report = build_demand_forecast(weeks=8)
+
+        resource = report["resources"][0]
+        self.assertEqual(resource["total"], 4)
+        self.assertEqual(resource["weekly_counts"][-4:], [1, 0, 2, 1])
+        self.assertEqual(resource["forecast"], 1.0)
+
+    def test_forecast_identifies_busiest_weekday(self):
+        self.create_booking(1, weekday=2)
+        self.create_booking(2, weekday=2)
+        self.create_booking(3, weekday=4)
+
+        report = build_demand_forecast(weeks=4)
+
+        self.assertEqual(report["busiest_weekday"], {"name": "Miércoles", "count": 2})
+
+    def test_forecast_page_rejects_non_staff_user(self):
+        self.client.login(username="cliente", password="segura-123")
+
+        response = self.client.get(reverse("demand_forecast"))
+
+        self.assertEqual(response.status_code, 302)
+        self.assertIn(reverse("login"), response.url)
+
+    def test_forecast_page_accepts_staff_and_limits_range(self):
+        self.client.login(username="gabriel", password="segura-789")
+
+        response = self.client.get(reverse("demand_forecast"), {"weeks": 100})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context["weeks"], 52)
+        self.assertContains(response, "promedio de reservas de las últimas cuatro semanas")
