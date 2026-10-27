@@ -1,5 +1,13 @@
 from django.contrib import admin
-from .models import Availability, Booking, BookingCancellation, Resource, UserProfile
+from .models import (
+    Availability,
+    Booking,
+    BookingCancellation,
+    InAppNotification,
+    Resource,
+    UserProfile,
+    WaitlistEntry,
+)
 
 # --- CONFIGURACIÓN DEL PANEL ADMIN ---
 
@@ -47,3 +55,17 @@ class BookingCancellationAdmin(admin.ModelAdmin):
 
     def has_delete_permission(self, request, obj=None):
         return False
+
+
+@admin.register(WaitlistEntry)
+class WaitlistEntryAdmin(admin.ModelAdmin):
+    list_display = ("user", "resource", "start_time", "status", "created_at")
+    list_filter = ("status", "resource")
+    search_fields = ("user__username", "resource__name")
+
+
+@admin.register(InAppNotification)
+class InAppNotificationAdmin(admin.ModelAdmin):
+    list_display = ("user", "message", "created_at", "read_at")
+    search_fields = ("user__username", "message")
+    readonly_fields = ("user", "message", "link", "created_at", "read_at")

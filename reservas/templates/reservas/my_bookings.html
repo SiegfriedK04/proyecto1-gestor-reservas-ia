@@ -46,6 +46,16 @@
         {% for booking in past_bookings %}
         <article class="booking past"><div><h3>{{ booking.resource.name }}</h3><p>{{ booking.start_time|date:"d/m/Y H:i" }}</p></div></article>
         {% empty %}<p>No hay reservas anteriores.</p>{% endfor %}
+
+        <h2>Lista de espera</h2>
+        {% for entry in waitlist_entries %}
+        <article class="booking"><div><h3>{{ entry.resource.name }}</h3><p>{{ entry.start_time|date:"d/m/Y H:i" }}</p><p>Estado: {{ entry.get_status_display }}</p></div></article>
+        {% empty %}<p>No estás en ninguna lista de espera.</p>{% endfor %}
+
+        <h2>Notificaciones</h2>
+        {% for notification in notifications %}
+        <article class="booking"><div><p>{{ notification.message }}</p><p>{{ notification.created_at|date:"d/m/Y H:i" }}</p>{% if notification.link %}<a href="{{ notification.link }}">Abrir calendario</a>{% endif %}</div></article>
+        {% empty %}<p>No tienes notificaciones.</p>{% endfor %}
     </main>
 </body>
 </html>

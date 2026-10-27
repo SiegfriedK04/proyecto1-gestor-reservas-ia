@@ -6,7 +6,15 @@ from django.test import Client, TestCase
 from django.urls import reverse
 from django.utils import timezone
 
-from .models import Availability, Booking, BookingCancellation, Resource, UserProfile
+from .models import (
+    Availability,
+    Booking,
+    BookingCancellation,
+    InAppNotification,
+    Resource,
+    UserProfile,
+    WaitlistEntry,
+)
 from .demand import build_demand_forecast
 
 
@@ -412,3 +420,116 @@ class MyBookingsTests(TestCase):
         response = self.client.get(reverse("cancel_booking", args=[booking.id]))
 
         self.assertEqual(response.status_code, 405)
+
+
+class WaitlistTests(TestCase):
+    def setUp(self):
+        self.owner = User.objects.create_user(username="titular", password="segura-123")
+        self.first = User.objects.create_user(username="primero", password="segura-456")
+        self.second = User.objects.create_user(username="segundo", password="segura-789")
+        self.resource = Resource.objects.create(name="Cancha Lista")
+        self.start = timezone.now() + timedelta(days=5)
+        self.end = self.start + timedelta(hours=1)
+        self.booking = Booking.objects.create(
+            user=self.owner,
+            resource=self.resource,
+            start_time=self.start,
+            end_time=self.end,
+        )
+
+    def payload(self):
+        return {
+            "resource_id": self.resource.id,
+            "start_time": self.start.isoformat(),
+            "end_time": self.end.isoformat(),
+        }
+
+    def join_as(self, username, password):
+        self.client.login(username=username, password=password)
+        response = self.client.post(
+            reverse("join_waitlist"),
+            data=self.payload(),
+            content_type="application/json",
+        )
+        self.client.logout()
+        return response
+
+    def test_waitlist_requires_authentication(self):
+        response = self.client.post(
+            reverse("join_waitlist"),
+            data=self.payload(),
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 403)
+        self.assertFalse(WaitlistEntry.objects.exists())
+
+    def test_user_cannot_join_same_slot_twice(self):
+        first_response = self.join_as("primero", "segura-456")
+        second_response = self.join_as("primero", "segura-456")
+
+        self.assertEqual(first_response.status_code, 201)
+        self.assertEqual(second_response.status_code, 409)
+        self.assertEqual(WaitlistEntry.objects.count(), 1)
+
+    def test_cancellation_notifies_first_waiting_user(self):
+        self.join_as("primero", "segura-456")
+        self.join_as("segundo", "segura-789")
+        self.client.login(username="titular", password="segura-123")
+
+        response = self.client.post(reverse("cancel_booking", args=[self.booking.id]))
+
+        self.assertRedirects(response, reverse("my_bookings"))
+        first_entry = WaitlistEntry.objects.get(user=self.first)
+        second_entry = WaitlistEntry.objects.get(user=self.second)
+        self.assertEqual(first_entry.status, WaitlistEntry.Status.NOTIFIED)
+        self.assertEqual(second_entry.status, WaitlistEntry.Status.WAITING)
+        self.assertIsNotNone(first_entry.notified_at)
+        self.assertTrue(InAppNotification.objects.filter(user=self.first).exists())
+        self.assertFalse(InAppNotification.objects.filter(user=self.second).exists())
+
+    def test_notified_user_has_priority_for_released_slot(self):
+        WaitlistEntry.objects.create(
+            user=self.first,
+            resource=self.resource,
+            start_time=self.start,
+            end_time=self.end,
+            status=WaitlistEntry.Status.NOTIFIED,
+            notified_at=timezone.now(),
+        )
+        self.booking.delete()
+        self.client.login(username="segundo", password="segura-789")
+        reservation_payload = {**self.payload(), "repeat_weeks": 0}
+
+        response = self.client.post(
+            reverse("api_crear_reserva"),
+            data=reservation_payload,
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 409)
+        self.assertFalse(Booking.objects.exists())
+
+    def test_notified_user_can_reserve_and_entry_is_completed(self):
+        entry = WaitlistEntry.objects.create(
+            user=self.first,
+            resource=self.resource,
+            start_time=self.start,
+            end_time=self.end,
+            status=WaitlistEntry.Status.NOTIFIED,
+            notified_at=timezone.now(),
+        )
+        self.booking.delete()
+        self.client.login(username="primero", password="segura-456")
+        reservation_payload = {**self.payload(), "repeat_weeks": 0}
+
+        response = self.client.post(
+            reverse("api_crear_reserva"),
+            data=reservation_payload,
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 201)
+        entry.refresh_from_db()
+        self.assertEqual(entry.status, WaitlistEntry.Status.BOOKED)
+        self.assertTrue(Booking.objects.filter(user=self.first).exists())

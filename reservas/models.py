@@ -86,3 +86,44 @@ class BookingCancellation(models.Model):
 
     def __str__(self):
         return f"Cancelación de {self.resource_name} por {self.user.username}"
+
+
+class WaitlistEntry(models.Model):
+    class Status(models.TextChoices):
+        WAITING = "waiting", "En espera"
+        NOTIFIED = "notified", "Notificado"
+        BOOKED = "booked", "Reserva completada"
+
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="waitlist_entries")
+    resource = models.ForeignKey(Resource, on_delete=models.CASCADE, related_name="waitlist_entries")
+    start_time = models.DateTimeField()
+    end_time = models.DateTimeField()
+    status = models.CharField(max_length=16, choices=Status.choices, default=Status.WAITING)
+    created_at = models.DateTimeField(auto_now_add=True)
+    notified_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ("created_at", "id")
+        constraints = [
+            models.UniqueConstraint(
+                fields=("user", "resource", "start_time", "end_time"),
+                name="unique_waitlist_slot_per_user",
+            )
+        ]
+
+    def __str__(self):
+        return f"{self.user.username} en espera para {self.resource.name}"
+
+
+class InAppNotification(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="notifications")
+    message = models.CharField(max_length=255)
+    link = models.CharField(max_length=255, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    read_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ("-created_at",)
+
+    def __str__(self):
+        return f"Notificación para {self.user.username}"
