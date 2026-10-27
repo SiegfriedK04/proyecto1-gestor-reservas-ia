@@ -8,6 +8,8 @@ from django.utils.dateparse import parse_datetime
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
+from django.contrib.admin.views.decorators import staff_member_required
+from .demand import build_demand_forecast
 from .forms import UserProfileForm
 from .models import Availability, Booking, Resource, UserProfile
 
@@ -211,6 +213,22 @@ def profile_view(request):
         form = UserProfileForm(instance=profile)
 
     return render(request, "reservas/profile.html", {"form": form})
+
+
+@staff_member_required(login_url="login")
+def demand_forecast(request):
+    """Panel administrativo de demanda histórica y previsión semanal."""
+    try:
+        weeks = int(request.GET.get("weeks", 8))
+    except (TypeError, ValueError):
+        weeks = 8
+    weeks = min(max(weeks, 4), 52)
+    report = build_demand_forecast(weeks=weeks)
+    report["resource_datasets"] = [
+        {"label": resource["name"], "data": resource["weekly_counts"]}
+        for resource in report["resources"]
+    ]
+    return render(request, "reservas/demand_forecast.html", report)
 
 def api_reservas(request, resource_id):
     """

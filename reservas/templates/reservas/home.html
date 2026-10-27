@@ -13,6 +13,7 @@
         <div>
             {% if user.is_authenticated %}
                 <span class="mr-4">Hola, {{ user.username }}</span>
+                {% if user.is_staff %}<a href="{% url 'demand_forecast' %}" class="bg-indigo-800 px-3 py-1 rounded mr-2 hover:bg-indigo-900">Previsión</a>{% endif %}
                 <a href="{% url 'profile' %}" class="bg-white text-blue-700 px-3 py-1 rounded mr-2 hover:bg-blue-50">Mis datos</a>
                 <a href="{% url 'logout' %}" class="bg-red-500 px-3 py-1 rounded hover:bg-red-600">Cerrar Sesión</a>
             {% else %}
