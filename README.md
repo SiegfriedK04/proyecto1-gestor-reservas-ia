@@ -47,6 +47,17 @@ El proyecto incluye protección CSRF, aislamiento de datos por usuario, validaci
 
 ## Instalación
 
+### Inicio rápido en Windows
+
+Haz doble clic en `iniciar_app.cmd`. El archivo crea el entorno si hace falta, instala dependencias, aplica migraciones, prepara datos variados y abre el navegador.
+
+Credenciales locales preparadas automáticamente:
+
+- Administración: `admin_user` / `admin1234`
+- Cliente de demostración: `demo_user` / `demo1234`
+
+### Inicio manual
+
 1. Clonar y abrir el repositorio:
 
    ```text
@@ -97,11 +108,13 @@ Las variables admitidas para otros entornos se documentan en `.env.example`.
 python manage.py crear_reservas_demo
 ```
 
-El comando crea únicamente datos locales y puede ejecutarse varias veces sin duplicarlos. Para regenerar solo esos datos:
+El comando crea cuatro recursos, tres clientes de ejemplo, reservas futuras visibles, actividad histórica para la previsión y un bloqueo de muestra. Puede ejecutarse varias veces sin duplicar datos. Para regenerar únicamente las reservas demostrativas:
 
 ```text
 python manage.py crear_reservas_demo --reset-demo
 ```
+
+Estas credenciales y datos deben usarse solo en desarrollo local.
 
 ## Uso de la aplicación
 

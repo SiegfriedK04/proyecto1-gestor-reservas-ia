@@ -1,32 +1,70 @@
-<!-- templates/base.html -->
+{% load static %}
 <!DOCTYPE html>
 <html lang="es">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}Gestor de Reservas{% endblock %}</title>
-    <link rel="stylesheet" href="{% static 'css/style.css' %}">
+    <meta name="description" content="Reserva espacios, administra tus horarios y consulta la disponibilidad desde un solo lugar.">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{% static 'css/app.css' %}">
+    {% block extra_head %}{% endblock %}
 </head>
 <body>
-    <!-- NAVBAR -->
-    <nav class="navbar">
-        <div class="container">
-            <h2 class="logo">Gestor de Reservas</h2>
-            <div class="nav-links">
-                <a href="/">Inicio</a>
+    <header class="site-header">
+        <div class="shell header-inner">
+            <a class="brand" href="{% url 'home' %}" aria-label="Ir al inicio">
+                <span class="brand-mark"><i data-lucide="calendar-check-2"></i></span>
+                <span><strong>Reserva</strong><small>Espacios y horarios</small></span>
+            </a>
+            <button class="nav-toggle" type="button" aria-label="Abrir navegación" aria-expanded="false" data-nav-toggle>
+                <i data-lucide="menu"></i>
+            </button>
+            <nav class="main-nav" aria-label="Navegación principal" data-nav>
+                <a href="{% url 'home' %}"><i data-lucide="layout-grid"></i><span>Recursos</span></a>
                 {% if user.is_authenticated %}
-                    <span>Hola, {{ user.username }}</span>
-                    <a href="/logout/">Cerrar sesión</a>
+                    <a href="{% url 'my_bookings' %}"><i data-lucide="calendar-clock"></i><span>Mis reservas</span></a>
+                    <a href="{% url 'profile' %}"><i data-lucide="user-round-cog"></i><span>Mis datos</span></a>
+                    {% if user.is_staff %}
+                    <a href="{% url 'demand_forecast' %}"><i data-lucide="chart-no-axes-combined"></i><span>Previsión</span></a>
+                    <a href="/admin/"><i data-lucide="shield-check"></i><span>Administración</span></a>
+                    {% endif %}
+                    <span class="user-chip"><i data-lucide="circle-user-round"></i>{{ user.first_name|default:user.username }}</span>
+                    <a class="nav-exit" href="{% url 'logout' %}"><i data-lucide="log-out"></i><span>Salir</span></a>
                 {% else %}
-                    <a href="/login/">Iniciar sesión</a>
+                    <a href="{% url 'login' %}"><i data-lucide="log-in"></i><span>Ingresar</span></a>
+                    <a class="nav-primary" href="{% url 'register' %}"><i data-lucide="user-plus"></i><span>Crear cuenta</span></a>
                 {% endif %}
-            </div>
+            </nav>
         </div>
-    </nav>
+    </header>
 
-    <!-- CONTENIDO -->
-    <main>
+    {% if messages %}
+    <div class="shell messages" aria-live="polite">
+        {% for message in messages %}
+        <div class="alert alert-{{ message.tags|default:'info' }}">
+            <i data-lucide="{% if message.tags == 'error' %}circle-alert{% else %}circle-check{% endif %}"></i>
+            <span>{{ message }}</span>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <main class="page-shell">
         {% block content %}{% endblock %}
     </main>
+
+    <footer class="site-footer">
+        <div class="shell footer-inner">
+            <span>Gestor de reservas</span>
+            <span>Disponibilidad clara, reservas sencillas.</span>
+        </div>
+    </footer>
+
+    <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+    <script src="{% static 'js/app.js' %}"></script>
+    {% block scripts %}{% endblock %}
 </body>
 </html>

@@ -1,10 +1,10 @@
 import json
-from datetime import datetime, timedelta, time
+from datetime import timedelta
 from django.shortcuts import render, get_object_or_404, redirect
 from django.http import JsonResponse
 from django.urls import reverse
+from django.utils.http import url_has_allowed_host_and_scheme
 from django.views.decorators.csrf import ensure_csrf_cookie
-from django.utils.dateformat import format as date_format
 from django.utils.dateparse import parse_datetime
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.decorators import login_required
@@ -14,7 +14,7 @@ from django.db import IntegrityError, transaction
 from django.utils import timezone
 from django.views.decorators.http import require_POST
 from .demand import build_demand_forecast
-from .forms import UserProfileForm
+from .forms import RegistrationForm, UserProfileForm
 from .models import (
     Availability,
     Booking,
@@ -26,72 +26,9 @@ from .models import (
 )
 
 
-# Horario por defecto (si no hay Availability definida)
-DEFAULT_START = time(9, 0)   # 09:00
-DEFAULT_END = time(21, 0)    # 21:00
-
-
 def calendario(request, resource_id):
-    """
-    Muestra un calendario semanal de reservas para un recurso.
-    """
-    resource = get_object_or_404(Resource, id=resource_id)
-
-    hoy = datetime.today()
-    inicio_semana = hoy - timedelta(days=hoy.weekday())  # Lunes
-    dias_semana = [inicio_semana + timedelta(days=i) for i in range(7)]
-
-    reservas = Booking.objects.filter(
-        resource=resource,
-        start_time__date__gte=inicio_semana,
-        start_time__date__lte=inicio_semana + timedelta(days=6)
-    ).order_by('start_time')
-
-    reservas_por_dia = {date_format(dia, 'Y-m-d'): [] for dia in dias_semana}
-    for reserva in reservas:
-        clave = date_format(reserva.start_time, 'Y-m-d')
-        reservas_por_dia[clave].append(reserva)
-
-    return render(request, 'reservas/calendario.html', {
-        'resource': resource,
-        'dias_semana': dias_semana,
-        'reservas_por_dia': reservas_por_dia,
-    })
-
-
-def calendario_navegable(request, resource_id):
-    """
-    Calendario semanal con botones de semana anterior/siguiente.
-    """
-    resource = get_object_or_404(Resource, id=resource_id)
-
-    hoy = datetime.today()
-    delta = 0
-    if request.GET.get('week') == 'prev':
-        delta = -7
-    elif request.GET.get('week') == 'next':
-        delta = 7
-
-    inicio_semana = (hoy - timedelta(days=hoy.weekday())) + timedelta(days=delta)
-    dias_semana = [inicio_semana + timedelta(days=i) for i in range(7)]
-
-    reservas = Booking.objects.filter(
-        resource=resource,
-        start_time__date__gte=inicio_semana,
-        start_time__date__lte=inicio_semana + timedelta(days=6)
-    ).order_by('start_time')
-
-    reservas_por_dia = {date_format(dia, 'Y-m-d'): [] for dia in dias_semana}
-    for reserva in reservas:
-        clave = date_format(reserva.start_time, 'Y-m-d')
-        reservas_por_dia[clave].append(reserva)
-
-    return render(request, 'reservas/calendario.html', {
-        'resource': resource,
-        'dias_semana': dias_semana,
-        'reservas_por_dia': reservas_por_dia,
-    })
-
+    """Conserva compatibilidad con enlaces antiguos hacia el calendario."""
+    return redirect("calendario_full", resource_id=resource_id)
 
 @ensure_csrf_cookie
 def calendario_full(request, resource_id):
@@ -106,7 +43,7 @@ def calendario_full(request, resource_id):
         if profile:
             default_repeat_weeks = profile.default_repeat_weeks
 
-    return render(request, 'reservas/calendario_full.html', {
+    return render(request, 'reservas/calendar.html', {
         'resource': resource,
         'resources': Resource.objects.order_by('name'),
         'is_authenticated': request.user.is_authenticated,
@@ -222,10 +159,29 @@ def login_view(request):
         user = authenticate(request, username=username, password=password)
         if user:
             login(request, user)
-            return redirect('/')
+            next_url = request.POST.get("next") or request.GET.get("next")
+            if next_url and url_has_allowed_host_and_scheme(next_url, allowed_hosts={request.get_host()}):
+                return redirect(next_url)
+            return redirect("home")
         else:
             messages.error(request, "Usuario o contraseña incorrectos.")
     return render(request, 'reservas/login.html')
+
+
+def register_view(request):
+    """Crea una cuenta de cliente e inicia su sesión."""
+    if request.user.is_authenticated:
+        return redirect("home")
+    if request.method == "POST":
+        form = RegistrationForm(request.POST)
+        if form.is_valid():
+            user = form.save()
+            login(request, user)
+            messages.success(request, "Tu cuenta fue creada correctamente.")
+            return redirect("home")
+    else:
+        form = RegistrationForm()
+    return render(request, "reservas/register.html", {"form": form})
 
 
 def logout_view(request):

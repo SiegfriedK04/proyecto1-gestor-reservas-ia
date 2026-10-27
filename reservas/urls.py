@@ -8,6 +8,7 @@ urlpatterns = [
     path('api/reservas/<int:resource_id>/', views.api_reservas, name='api_reservas'),
     path('api/reservas/crear/', views.api_crear_reserva, name='api_crear_reserva'),
     path('login/', views.login_view, name='login'),
+    path('registro/', views.register_view, name='register'),
     path('logout/', views.logout_view, name='logout'),
     path('perfil/', views.profile_view, name='profile'),
     path('administracion/prevision-demanda/', views.demand_forecast, name='demand_forecast'),

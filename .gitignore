@@ -8,4 +8,5 @@ htmlcov/
 .pytest_cache/
 .idea/
 .vscode/
+.logs/
 

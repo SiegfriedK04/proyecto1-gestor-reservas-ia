@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+
+{% block title %}Crear cuenta | Gestor de reservas{% endblock %}
+
+{% block content %}
+<section class="card form-card">
+    <div class="form-intro">
+        <p class="eyebrow">Nueva cuenta</p>
+        <h1>Crea tu perfil de cliente</h1>
+        <p>Usa una cuenta personal para reservar y recibir avisos sobre tus horarios.</p>
+    </div>
+    <form method="post">
+        {% csrf_token %}
+        {% if form.non_field_errors %}<div class="alert alert-error">{{ form.non_field_errors }}</div>{% endif %}
+        <div class="form-grid">
+            {% for field in form %}
+            <div class="field {% if field.name == 'username' or field.name == 'email' or field.name == 'password1' or field.name == 'password2' %}full{% endif %}">
+                {{ field.label_tag }}
+                {{ field }}
+                {% if field.help_text %}<span class="helptext">{{ field.help_text|safe }}</span>{% endif %}
+                {{ field.errors }}
+            </div>
+            {% endfor %}
+        </div>
+        <div class="form-actions">
+            <button class="btn btn-primary" type="submit"><i data-lucide="user-plus"></i> Crear cuenta</button>
+            <a class="btn btn-secondary" href="{% url 'login' %}">Ya tengo una cuenta</a>
+        </div>
+    </form>
+</section>
+{% endblock %}
