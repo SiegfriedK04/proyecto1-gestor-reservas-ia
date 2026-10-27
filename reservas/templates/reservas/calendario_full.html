@@ -209,6 +209,25 @@
                     failure: function() {
                         alert('No fue posible cargar la disponibilidad.');
                     }
+                },
+                eventClick: function(info) {
+                    const status = info.event.extendedProps.status;
+                    const owned = info.event.extendedProps.owned;
+                    if (status === 'blocked') {
+                        alert('Este horario no está disponible.');
+                        return;
+                    }
+                    if (owned) {
+                        alert('Esta reserva ya te pertenece. Puedes administrarla desde Mis reservas.');
+                        return;
+                    }
+                    if (!userLogged) {
+                        alert('Debes iniciar sesión para entrar en la lista de espera.');
+                        return;
+                    }
+                    if (confirm('El horario está ocupado. ¿Quieres entrar en la lista de espera?')) {
+                        entrarListaEspera(info.event.start.toISOString(), info.event.end.toISOString());
+                    }
                 }
 
             });
@@ -245,6 +264,26 @@
                         calendar.refetchEvents();
                     } else {
                         alert(data.error || 'Error al crear la reserva.');
+                    }
+                })
+                .catch(error => console.error('Error:', error));
+            }
+
+            function entrarListaEspera(start, end) {
+                fetch('{% url "join_waitlist" %}', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': getCookie('csrftoken')
+                    },
+                    body: JSON.stringify({ resource_id: resourceId, start_time: start, end_time: end })
+                })
+                .then(async response => ({ ok: response.ok, data: await response.json() }))
+                .then(result => {
+                    if (result.ok) {
+                        alert(`Ingresaste en la lista de espera. Posición actual: ${result.data.position}.`);
+                    } else {
+                        alert(result.data.error || 'No fue posible entrar en la lista de espera.');
                     }
                 })
                 .catch(error => console.error('Error:', error));

@@ -2,6 +2,7 @@ import json
 from datetime import datetime, timedelta, time
 from django.shortcuts import render, get_object_or_404, redirect
 from django.http import JsonResponse
+from django.urls import reverse
 from django.views.decorators.csrf import ensure_csrf_cookie
 from django.utils.dateformat import format as date_format
 from django.utils.dateparse import parse_datetime
@@ -9,12 +10,20 @@ from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.contrib.admin.views.decorators import staff_member_required
-from django.db import transaction
+from django.db import IntegrityError, transaction
 from django.utils import timezone
 from django.views.decorators.http import require_POST
 from .demand import build_demand_forecast
 from .forms import UserProfileForm
-from .models import Availability, Booking, BookingCancellation, Resource, UserProfile
+from .models import (
+    Availability,
+    Booking,
+    BookingCancellation,
+    InAppNotification,
+    Resource,
+    UserProfile,
+    WaitlistEntry,
+)
 
 
 # Horario por defecto (si no hay Availability definida)
@@ -146,6 +155,17 @@ def api_crear_reserva(request):
             return JsonResponse({'success': False, 'error': 'El recurso solicitado no existe.'}, status=404)
 
         for index, (start, end) in enumerate(occurrences, start=1):
+            priority_entry = WaitlistEntry.objects.select_for_update().filter(
+                resource=resource,
+                start_time=start,
+                end_time=end,
+                status=WaitlistEntry.Status.NOTIFIED,
+            ).first()
+            if priority_entry and priority_entry.user != request.user:
+                return JsonResponse({
+                    'success': False,
+                    'error': f'La semana {index} está reservada temporalmente para la lista de espera.',
+                }, status=409)
             if Availability.objects.filter(
                 resource=resource,
                 start_time__lt=end,
@@ -174,6 +194,14 @@ def api_crear_reserva(request):
             )
             for start, end in occurrences
         ])
+        for start, end in occurrences:
+            WaitlistEntry.objects.filter(
+                user=request.user,
+                resource=resource,
+                status=WaitlistEntry.Status.NOTIFIED,
+                start_time=start,
+                end_time=end,
+            ).update(status=WaitlistEntry.Status.BOOKED)
 
     return JsonResponse({
         'success': True,
@@ -249,6 +277,8 @@ def my_bookings(request):
         "upcoming_bookings": bookings.filter(start_time__gt=now).order_by("start_time"),
         "past_bookings": bookings.filter(start_time__lte=now).order_by("-start_time")[:10],
         "cancellation_deadline": now + timedelta(hours=24),
+        "waitlist_entries": WaitlistEntry.objects.filter(user=request.user).select_related("resource")[:10],
+        "notifications": InAppNotification.objects.filter(user=request.user)[:10],
     })
 
 
@@ -266,6 +296,9 @@ def cancel_booking(request, booking_id):
         return redirect("my_bookings")
 
     with transaction.atomic():
+        resource = booking.resource
+        start_time = booking.start_time
+        end_time = booking.end_time
         BookingCancellation.objects.create(
             user=request.user,
             resource_name=booking.resource.name,
@@ -273,8 +306,75 @@ def cancel_booking(request, booking_id):
             end_time=booking.end_time,
         )
         booking.delete()
+        next_entry = WaitlistEntry.objects.select_for_update().filter(
+            resource=resource,
+            start_time=start_time,
+            end_time=end_time,
+            status=WaitlistEntry.Status.WAITING,
+        ).exclude(user=request.user).order_by("created_at", "id").first()
+        if next_entry:
+            next_entry.status = WaitlistEntry.Status.NOTIFIED
+            next_entry.notified_at = timezone.now()
+            next_entry.save(update_fields=("status", "notified_at"))
+            InAppNotification.objects.create(
+                user=next_entry.user,
+                message=f"Se liberó el horario solicitado para {resource.name}.",
+                link=reverse("calendario_full", args=[resource.id]),
+            )
     messages.success(request, "La reserva fue cancelada correctamente.")
     return redirect("my_bookings")
+
+
+@require_POST
+def join_waitlist(request):
+    """Añade al usuario a la lista de espera de una reserva existente."""
+    if not request.user.is_authenticated:
+        return JsonResponse({"success": False, "error": "Debes iniciar sesión."}, status=403)
+    try:
+        data = json.loads(request.body)
+        resource_id = int(data.get("resource_id"))
+        start_time = parse_datetime(data.get("start_time", ""))
+        end_time = parse_datetime(data.get("end_time", ""))
+    except (TypeError, ValueError, json.JSONDecodeError):
+        return JsonResponse({"success": False, "error": "Los datos no son válidos."}, status=400)
+
+    if start_time is None or end_time is None or start_time >= end_time:
+        return JsonResponse({"success": False, "error": "El intervalo no es válido."}, status=400)
+    if timezone.is_naive(start_time):
+        start_time = timezone.make_aware(start_time)
+    if timezone.is_naive(end_time):
+        end_time = timezone.make_aware(end_time)
+    if start_time <= timezone.now():
+        return JsonResponse({"success": False, "error": "El horario ya pasó."}, status=400)
+
+    booking = Booking.objects.filter(
+        resource_id=resource_id,
+        start_time=start_time,
+        end_time=end_time,
+    ).first()
+    if not booking:
+        return JsonResponse({"success": False, "error": "El horario ya está disponible."}, status=409)
+    if booking.user == request.user:
+        return JsonResponse({"success": False, "error": "La reserva ya te pertenece."}, status=409)
+
+    try:
+        entry, created = WaitlistEntry.objects.get_or_create(
+            user=request.user,
+            resource=booking.resource,
+            start_time=booking.start_time,
+            end_time=booking.end_time,
+        )
+    except IntegrityError:
+        created = False
+        entry = None
+    if not created:
+        return JsonResponse({"success": False, "error": "Ya estás en la lista de espera para este horario."}, status=409)
+    return JsonResponse({"success": True, "position": entry.resource.waitlist_entries.filter(
+        start_time=entry.start_time,
+        end_time=entry.end_time,
+        status=WaitlistEntry.Status.WAITING,
+        created_at__lte=entry.created_at,
+    ).count()}, status=201)
 
 def api_reservas(request, resource_id):
     """
