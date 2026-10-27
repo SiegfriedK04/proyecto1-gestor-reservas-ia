@@ -102,6 +102,7 @@
         <div class="nav-right">
             {% if is_authenticated %}
                 <span class="user-info">Hola, {{ user.username }}</span>
+                <a href="{% url 'profile' %}">Mis datos</a>
                 <a href="/logout/" class="btn-logout">Cerrar Sesión</a>
             {% else %}
                 <a href="/login/" class="btn-login">Iniciar Sesión</a>
@@ -123,7 +124,8 @@
     <!-- Contenedor del calendario con data-resource-id y user-logged -->
     <div id='calendar' 
          data-resource-id="{{ resource.id }}" 
-         data-user-logged="{{ is_authenticated }}">
+         data-user-logged="{{ is_authenticated }}"
+         data-default-repeat-weeks="{{ default_repeat_weeks }}">
     </div>
 
     <script>
@@ -133,6 +135,7 @@
             const calendarElement = document.getElementById('calendar');
             const resourceId = calendarElement.dataset.resourceId;
             const userLogged = calendarElement.dataset.userLogged === "True";
+            const defaultRepeatWeeks = Number(calendarElement.dataset.defaultRepeatWeeks || 0);
 
             // Datos de reservas y bloqueos enviados desde Django
             const reservas = JSON.parse('{{ reservas_json|escapejs }}');
@@ -213,7 +216,10 @@
 
             // === FUNCIÓN CREAR RESERVA CON REPETICIONES ===
             function crearReserva(start, end) {
-                let repeat = prompt("¿Cuántas semanas quieres repetir esta reserva? (0 = solo esta semana)", "0");
+                let repeat = prompt(
+                    "¿Cuántas semanas quieres repetir esta reserva? (0 = solo esta semana)",
+                    String(defaultRepeatWeeks)
+                );
                 if (repeat === null) return;
                 repeat = parseInt(repeat);
                 if (isNaN(repeat) || repeat < 0) repeat = 0;
