@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Resource, Availability, Booking
+from .models import Availability, Booking, Resource, UserProfile
 
 # --- CONFIGURACIÓN DEL PANEL ADMIN ---
 
@@ -23,3 +23,10 @@ class BookingAdmin(admin.ModelAdmin):
     list_display = ('id', 'user', 'resource', 'start_time', 'end_time', 'created_at')
     list_filter = ('resource', 'user')
     search_fields = ('user__username', 'resource__name')
+
+
+@admin.register(UserProfile)
+class UserProfileAdmin(admin.ModelAdmin):
+    list_display = ("user", "phone", "preferred_resource", "default_repeat_weeks")
+    search_fields = ("user__username", "user__first_name", "user__last_name", "phone")
+    list_filter = ("preferred_resource",)

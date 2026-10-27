@@ -12,6 +12,24 @@ class Resource(models.Model):
         return self.name
 
 
+class UserProfile(models.Model):
+    """Datos reutilizables y preferencias no sensibles del cliente."""
+
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name="reservation_profile")
+    phone = models.CharField(max_length=30, blank=True)
+    preferred_resource = models.ForeignKey(
+        Resource,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="preferred_by_profiles",
+    )
+    default_repeat_weeks = models.PositiveSmallIntegerField(default=0)
+
+    def __str__(self):
+        return f"Perfil de {self.user.username}"
+
+
 class Availability(models.Model):
     """Horarios disponibles para cada recurso."""
     resource = models.ForeignKey(Resource, on_delete=models.CASCADE, related_name='availabilities')

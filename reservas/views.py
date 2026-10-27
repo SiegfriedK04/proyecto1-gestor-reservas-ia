@@ -6,9 +6,10 @@ from django.views.decorators.csrf import csrf_exempt
 from django.utils.dateformat import format as date_format
 from django.utils.dateparse import parse_datetime
 from django.contrib.auth import authenticate, login, logout
+from django.contrib.auth.decorators import login_required
 from django.contrib import messages
-from .models import Resource, Booking, Availability
-from .models import Resource
+from .forms import UserProfileForm
+from .models import Availability, Booking, Resource, UserProfile
 
 
 # Horario por defecto (si no hay Availability definida)
@@ -107,11 +108,18 @@ def calendario_full(request, resource_id):
         for bloqueo in bloqueos
     ]
 
+    default_repeat_weeks = 0
+    if request.user.is_authenticated:
+        profile = UserProfile.objects.filter(user=request.user).first()
+        if profile:
+            default_repeat_weeks = profile.default_repeat_weeks
+
     return render(request, 'reservas/calendario_full.html', {
         'resource': resource,
         'reservas_json': json.dumps(reservas_json),
         'bloqueos_json': json.dumps(bloqueos_json),
         'is_authenticated': request.user.is_authenticated,
+        'default_repeat_weeks': default_repeat_weeks,
     })
 
 
@@ -188,6 +196,22 @@ def logout_view(request):
     logout(request)
     return redirect('/login/')
 
+
+@login_required
+def profile_view(request):
+    """Permite al cliente administrar datos reutilizables y preferencias."""
+    profile, _ = UserProfile.objects.get_or_create(user=request.user)
+    if request.method == "POST":
+        form = UserProfileForm(request.POST, instance=profile)
+        if form.is_valid():
+            form.save()
+            messages.success(request, "Tus datos y preferencias fueron actualizados.")
+            return redirect("profile")
+    else:
+        form = UserProfileForm(instance=profile)
+
+    return render(request, "reservas/profile.html", {"form": form})
+
 def api_reservas(request, resource_id):
     """
     API que devuelve todas las reservas de un recurso en formato JSON.
@@ -209,6 +233,14 @@ def home(request):
     Vista principal que muestra todas las pistas (resources).
     """
     resources = Resource.objects.all()  # Obtenemos todas las pistas
-    return render(request, 'reservas/home.html', {'resources': resources})
+    preferred_resource_id = None
+    if request.user.is_authenticated:
+        profile = UserProfile.objects.filter(user=request.user).first()
+        if profile:
+            preferred_resource_id = profile.preferred_resource_id
+    return render(request, 'reservas/home.html', {
+        'resources': resources,
+        'preferred_resource_id': preferred_resource_id,
+    })
 
 
