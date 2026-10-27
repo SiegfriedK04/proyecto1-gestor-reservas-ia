@@ -1,61 +1,45 @@
-<!DOCTYPE html>
-<html lang="es">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Previsión de demanda</title>
+{% extends "base.html" %}
+
+{% block title %}Previsión de demanda | Gestor de reservas{% endblock %}
+
+{% block extra_head %}
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
-    <style>
-        body { margin: 0; font-family: Arial, sans-serif; background: #f3f4f6; color: #111827; }
-        nav { background: #1e3a8a; color: white; padding: 16px 24px; display: flex; justify-content: space-between; }
-        nav a { color: white; text-decoration: none; }
-        main { max-width: 1100px; margin: 32px auto; padding: 0 20px 40px; }
-        .controls, .panel, .metric { background: white; border: 1px solid #d1d5db; border-radius: 8px; padding: 18px; }
-        .controls { display: flex; align-items: end; gap: 12px; margin-bottom: 20px; }
-        label { display: block; font-weight: 700; margin-bottom: 6px; }
-        select, button { padding: 9px 12px; border: 1px solid #9ca3af; border-radius: 5px; }
-        button { background: #1d4ed8; color: white; border-color: #1d4ed8; cursor: pointer; }
-        .metrics { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 20px; }
-        .metric strong { display: block; font-size: 1.7rem; margin-top: 8px; }
-        .charts { display: grid; grid-template-columns: 2fr 1fr; gap: 20px; }
-        .panel { min-width: 0; }
-        table { width: 100%; border-collapse: collapse; margin-top: 20px; background: white; }
-        th, td { border: 1px solid #d1d5db; padding: 10px; text-align: left; }
-        th { background: #e5e7eb; }
-        .note { line-height: 1.5; color: #4b5563; }
-        @media (max-width: 800px) { .metrics, .charts { grid-template-columns: 1fr; } }
-    </style>
-</head>
-<body>
-    <nav><strong>Previsión de demanda</strong><a href="{% url 'home' %}">Volver a recursos</a></nav>
-    <main>
-        <h1>Comportamiento histórico de reservas</h1>
-        <form method="get" class="controls">
-            <div>
-                <label for="weeks">Periodo analizado</label>
-                <select id="weeks" name="weeks">
-                    <option value="4" {% if weeks == 4 %}selected{% endif %}>4 semanas</option>
-                    <option value="8" {% if weeks == 8 %}selected{% endif %}>8 semanas</option>
-                    <option value="12" {% if weeks == 12 %}selected{% endif %}>12 semanas</option>
-                    <option value="26" {% if weeks == 26 %}selected{% endif %}>26 semanas</option>
-                    <option value="52" {% if weeks == 52 %}selected{% endif %}>52 semanas</option>
-                </select>
-            </div>
-            <button type="submit">Actualizar</button>
-        </form>
+{% endblock %}
 
-        <section class="metrics">
-            <div class="metric">Reservas analizadas<strong>{{ total_bookings }}</strong></div>
-            <div class="metric">Día con mayor demanda<strong>{% if busiest_weekday %}{{ busiest_weekday.name }}{% else %}Sin datos{% endif %}</strong></div>
-            <div class="metric">Semanas completas<strong>{{ weeks }}</strong></div>
-        </section>
+{% block content %}
+<header class="page-heading">
+    <div><p class="eyebrow">Panel administrativo</p><h1>Previsión de demanda</h1><p class="lead">Analiza el comportamiento histórico y estima la demanda de la próxima semana.</p></div>
+</header>
 
-        <section class="charts">
-            <div class="panel"><h2>Reservas por semana y recurso</h2><canvas id="weeklyChart"></canvas></div>
-            <div class="panel"><h2>Distribución por día</h2><canvas id="weekdayChart"></canvas></div>
-        </section>
+<form method="get" class="toolbar">
+    <div class="toolbar-group">
+        <div>
+            <label for="weeks">Periodo analizado</label>
+            <select id="weeks" name="weeks" aria-label="Cantidad de semanas analizadas">
+                <option value="4" {% if weeks == 4 %}selected{% endif %}>4 semanas</option>
+                <option value="8" {% if weeks == 8 %}selected{% endif %}>8 semanas</option>
+                <option value="12" {% if weeks == 12 %}selected{% endif %}>12 semanas</option>
+                <option value="26" {% if weeks == 26 %}selected{% endif %}>26 semanas</option>
+                <option value="52" {% if weeks == 52 %}selected{% endif %}>52 semanas</option>
+            </select>
+        </div>
+        <button class="btn btn-primary" type="submit"><i data-lucide="refresh-cw"></i> Actualizar análisis</button>
+    </div>
+</form>
 
-        <table>
+<section class="summary-grid">
+    <div class="summary-card"><span class="summary-label"><i data-lucide="calendar-check"></i> Reservas analizadas</span><strong>{{ total_bookings }}</strong></div>
+    <div class="summary-card"><span class="summary-label"><i data-lucide="trending-up"></i> Día con mayor demanda</span><strong>{% if busiest_weekday %}{{ busiest_weekday.name }}{% else %}Sin datos{% endif %}</strong></div>
+    <div class="summary-card"><span class="summary-label"><i data-lucide="calendar-range"></i> Semanas completas</span><strong>{{ weeks }}</strong></div>
+</section>
+
+<section class="charts-grid">
+    <article class="chart-card"><h2>Reservas por semana y recurso</h2><div class="chart-wrap"><canvas id="weeklyChart"></canvas></div></article>
+    <article class="chart-card"><h2>Distribución por día</h2><div class="chart-wrap"><canvas id="weekdayChart"></canvas></div></article>
+</section>
+
+<div class="table-wrap">
+    <table>
             <thead><tr><th>Recurso</th><th>Total histórico</th><th>Previsión próxima semana</th></tr></thead>
             <tbody>
                 {% for resource in resources %}
@@ -64,15 +48,18 @@
                 <tr><td colspan="3">No existen recursos configurados.</td></tr>
                 {% endfor %}
             </tbody>
-        </table>
+    </table>
+</div>
 
-        <p class="note"><strong>Método:</strong> la previsión corresponde al promedio de reservas de las últimas cuatro semanas completas del periodo. Es una referencia operativa, no considera feriados, promociones ni eventos externos. Las semanas sin reservas cuentan como cero.</p>
-    </main>
-    {{ resource_datasets|json_script:"resource-datasets-data" }}
-    {{ week_labels|json_script:"week-labels-data" }}
-    {{ weekday_names|json_script:"weekday-names-data" }}
-    {{ weekday_counts|json_script:"weekday-counts-data" }}
-    <script>
+<p class="method-note"><strong>Método:</strong> la previsión corresponde al promedio de reservas de las últimas cuatro semanas completas del periodo. Es una referencia operativa y no considera feriados, promociones ni eventos externos. Las semanas sin reservas cuentan como cero.</p>
+{{ resource_datasets|json_script:"resource-datasets-data" }}
+{{ week_labels|json_script:"week-labels-data" }}
+{{ weekday_names|json_script:"weekday-names-data" }}
+{{ weekday_counts|json_script:"weekday-counts-data" }}
+{% endblock %}
+
+{% block scripts %}
+<script>
         const colors = ['#2563eb', '#059669', '#d97706', '#7c3aed', '#dc2626'];
         const datasets = JSON.parse(document.getElementById('resource-datasets-data').textContent).map((item, index) => ({
             ...item,
@@ -82,7 +69,8 @@
         }));
         new Chart(document.getElementById('weeklyChart'), {
             type: 'line',
-            data: { labels: JSON.parse(document.getElementById('week-labels-data').textContent), datasets }
+            data: { labels: JSON.parse(document.getElementById('week-labels-data').textContent), datasets },
+            options: { responsive: true, maintainAspectRatio: false }
         });
         new Chart(document.getElementById('weekdayChart'), {
             type: 'bar',
@@ -90,8 +78,7 @@
                 labels: JSON.parse(document.getElementById('weekday-names-data').textContent),
                 datasets: [{ label: 'Reservas', data: JSON.parse(document.getElementById('weekday-counts-data').textContent), backgroundColor: '#1d4ed8' }]
             },
-            options: { plugins: { legend: { display: false } } }
+            options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } }
         });
-    </script>
-</body>
-</html>
+</script>
+{% endblock %}

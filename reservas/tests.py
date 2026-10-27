@@ -4,7 +4,7 @@ from io import StringIO
 from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
 from django.core.management import call_command
-from django.test import Client, TestCase
+from django.test import Client, TestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
 
@@ -234,7 +234,7 @@ class CalendarAvailabilityTests(TestCase):
     def test_calendar_contains_legend_navigation_and_dynamic_refresh(self):
         response = self.client.get(reverse("calendario_full", args=[self.resource.id]))
 
-        self.assertContains(response, "Estados del calendario")
+        self.assertContains(response, "Estados de disponibilidad")
         self.assertContains(response, "resource-selector")
         self.assertContains(response, "calendar.refetchEvents()")
         self.assertContains(response, reverse("api_reservas", args=[self.resource.id]))
@@ -291,6 +291,57 @@ class UserProfileTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'data-default-repeat-weeks="4"')
+
+
+class RegistrationTests(TestCase):
+    def test_registration_page_uses_shared_responsive_form(self):
+        response = self.client.get(reverse("register"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Crea tu perfil de cliente")
+        self.assertContains(response, 'class="form-grid"')
+
+    def test_user_can_create_account_and_is_logged_in(self):
+        response = self.client.post(reverse("register"), {
+            "username": "nuevo_cliente",
+            "first_name": "María",
+            "last_name": "López",
+            "email": "CLIENTE@EXAMPLE.COM",
+            "password1": "Reserva-Segura-2026!",
+            "password2": "Reserva-Segura-2026!",
+        })
+
+        self.assertRedirects(response, reverse("home"))
+        user = User.objects.get(username="nuevo_cliente")
+        self.assertEqual(user.email, "cliente@example.com")
+        self.assertEqual(int(self.client.session["_auth_user_id"]), user.id)
+
+    def test_registration_rejects_duplicate_email(self):
+        User.objects.create_user(username="existente", email="cliente@example.com", password="segura-123")
+
+        response = self.client.post(reverse("register"), {
+            "username": "otro_cliente",
+            "first_name": "Otro",
+            "last_name": "Cliente",
+            "email": "Cliente@Example.com",
+            "password1": "Reserva-Segura-2026!",
+            "password2": "Reserva-Segura-2026!",
+        })
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Ya existe una cuenta con este correo electrónico")
+        self.assertFalse(User.objects.filter(username="otro_cliente").exists())
+
+    def test_login_ignores_external_redirect(self):
+        User.objects.create_user(username="cliente", password="segura-123")
+
+        response = self.client.post(reverse("login"), {
+            "username": "cliente",
+            "password": "segura-123",
+            "next": "https://example.com/externo",
+        })
+
+        self.assertRedirects(response, reverse("home"))
 
 
 class DemandForecastTests(TestCase):
@@ -537,14 +588,24 @@ class WaitlistTests(TestCase):
         self.assertTrue(Booking.objects.filter(user=self.first).exists())
 
 
+@override_settings(DEBUG=True)
 class DemoDataCommandTests(TestCase):
     def test_demo_command_is_idempotent(self):
         call_command("crear_reservas_demo", stdout=StringIO())
+        first_count = Booking.objects.filter(user__username__in=("demo_user", "ana_demo", "luis_demo")).count()
         call_command("crear_reservas_demo", stdout=StringIO())
 
-        demo_user = User.objects.get(username="demo_user")
-        demo_resource = Resource.objects.get(name="Pista Pádel 1")
-        self.assertEqual(Booking.objects.filter(user=demo_user, resource=demo_resource).count(), 15)
+        self.assertGreater(first_count, 20)
+        self.assertEqual(
+            Booking.objects.filter(user__username__in=("demo_user", "ana_demo", "luis_demo")).count(),
+            first_count,
+        )
+        self.assertEqual(Resource.objects.filter(name__in=(
+            "Cancha de Pádel Bahía", "Cancha de Tenis Central", "Sala Creativa", "Auditorio Horizonte",
+        )).count(), 4)
+        admin = User.objects.get(username="admin_user")
+        self.assertTrue(admin.is_superuser)
+        self.assertTrue(admin.check_password("admin1234"))
 
     def test_demo_reset_preserves_unrelated_bookings(self):
         user = User.objects.create_user(username="real", password="segura-123")

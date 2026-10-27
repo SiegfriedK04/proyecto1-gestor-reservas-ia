@@ -1,61 +1,66 @@
-<!DOCTYPE html>
-<html lang="es">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Mis reservas</title>
-    <style>
-        body { margin: 0; font-family: Arial, sans-serif; background: #f3f4f6; color: #111827; }
-        nav { background: #2563eb; color: white; padding: 16px 24px; display: flex; justify-content: space-between; }
-        nav a { color: white; text-decoration: none; }
-        main { max-width: 900px; margin: 36px auto; padding: 0 20px 40px; }
-        .message { padding: 12px; border: 1px solid #9ca3af; background: white; margin: 14px 0; }
-        .booking { background: white; border: 1px solid #d1d5db; padding: 18px; margin: 12px 0; display: flex; justify-content: space-between; gap: 20px; align-items: center; }
-        .booking h3 { margin: 0 0 8px; }
-        .booking p { margin: 4px 0; color: #4b5563; }
-        button { background: #b91c1c; color: white; border: 0; border-radius: 5px; padding: 10px 14px; cursor: pointer; }
-        button[disabled] { background: #9ca3af; cursor: not-allowed; }
-        .past { opacity: .72; }
-    </style>
-</head>
-<body>
-    <nav><strong>Mis reservas</strong><a href="{% url 'home' %}">Volver a recursos</a></nav>
-    <main>
-        <h1>Próximas reservas</h1>
-        <p>La cancelación está disponible hasta 24 horas antes del inicio.</p>
-        {% for message in messages %}<div class="message">{{ message }}</div>{% endfor %}
+{% extends "base.html" %}
+
+{% block title %}Mis reservas | Gestor de reservas{% endblock %}
+
+{% block content %}
+<header class="page-heading">
+    <div>
+        <p class="eyebrow">Actividad personal</p>
+        <h1>Mis reservas</h1>
+        <p class="lead">Consulta tus próximos horarios, cancelaciones disponibles y avisos de la lista de espera.</p>
+    </div>
+    <div class="page-heading-actions"><a class="btn btn-primary" href="{% url 'home' %}"><i data-lucide="plus"></i> Nueva reserva</a></div>
+</header>
+
+<section class="summary-grid" aria-label="Resumen de actividad">
+    <div class="summary-card"><span class="summary-label"><i data-lucide="calendar-check"></i> Próximas</span><strong>{{ upcoming_bookings|length }}</strong></div>
+    <div class="summary-card"><span class="summary-label"><i data-lucide="list-clock"></i> En lista de espera</span><strong>{{ waitlist_entries|length }}</strong></div>
+    <div class="summary-card"><span class="summary-label"><i data-lucide="bell"></i> Notificaciones</span><strong>{{ notifications|length }}</strong></div>
+</section>
+
+<div class="content-grid">
+    <div class="stack">
+        <div class="section-header"><div><h2>Próximas reservas</h2><p>Puedes cancelar hasta 24 horas antes del inicio.</p></div></div>
         {% for booking in upcoming_bookings %}
-        <article class="booking">
-            <div>
-                <h3>{{ booking.resource.name }}</h3>
-                <p>Inicio: {{ booking.start_time|date:"d/m/Y H:i" }}</p>
-                <p>Fin: {{ booking.end_time|date:"d/m/Y H:i" }}</p>
+        <article class="booking-card">
+            <div class="booking-main">
+                <span class="booking-icon"><i data-lucide="calendar-check-2"></i></span>
+                <div><h3>{{ booking.resource.name }}</h3><p>{{ booking.start_time|date:"l d \d\e F, H:i" }} - {{ booking.end_time|date:"H:i" }}</p></div>
             </div>
             <form method="post" action="{% url 'cancel_booking' booking.id %}" onsubmit="return confirm('¿Confirmas la cancelación de esta reserva?');">
                 {% csrf_token %}
                 {% if booking.start_time >= cancellation_deadline %}
-                <button type="submit">Cancelar reserva</button>
+                <button class="btn btn-danger" type="submit"><i data-lucide="calendar-x-2"></i> Cancelar</button>
                 {% else %}
-                <button type="button" disabled>Fuera del plazo</button>
+                <button class="btn btn-secondary" type="button" disabled><i data-lucide="lock-keyhole"></i> Fuera del plazo</button>
                 {% endif %}
             </form>
         </article>
-        {% empty %}<p>No tienes reservas próximas.</p>{% endfor %}
+        {% empty %}<div class="empty-state"><i data-lucide="calendar-plus"></i><p>No tienes reservas próximas.</p></div>{% endfor %}
 
-        <h2>Reservas anteriores</h2>
+        <div class="section-header section"><div><h2>Historial reciente</h2></div></div>
         {% for booking in past_bookings %}
-        <article class="booking past"><div><h3>{{ booking.resource.name }}</h3><p>{{ booking.start_time|date:"d/m/Y H:i" }}</p></div></article>
-        {% empty %}<p>No hay reservas anteriores.</p>{% endfor %}
+        <article class="booking-card muted-card"><div class="booking-main"><span class="booking-icon"><i data-lucide="history"></i></span><div><h3>{{ booking.resource.name }}</h3><p>{{ booking.start_time|date:"d/m/Y, H:i" }}</p></div></div></article>
+        {% empty %}<div class="empty-state"><i data-lucide="archive"></i><p>No hay reservas anteriores.</p></div>{% endfor %}
+    </div>
 
-        <h2>Lista de espera</h2>
-        {% for entry in waitlist_entries %}
-        <article class="booking"><div><h3>{{ entry.resource.name }}</h3><p>{{ entry.start_time|date:"d/m/Y H:i" }}</p><p>Estado: {{ entry.get_status_display }}</p></div></article>
-        {% empty %}<p>No estás en ninguna lista de espera.</p>{% endfor %}
-
-        <h2>Notificaciones</h2>
-        {% for notification in notifications %}
-        <article class="booking"><div><p>{{ notification.message }}</p><p>{{ notification.created_at|date:"d/m/Y H:i" }}</p>{% if notification.link %}<a href="{{ notification.link }}">Abrir calendario</a>{% endif %}</div></article>
-        {% empty %}<p>No tienes notificaciones.</p>{% endfor %}
-    </main>
-</body>
-</html>
+    <aside class="stack">
+        <section class="card">
+            <div class="section-header"><div><h2>Lista de espera</h2><p>Estado de tus solicitudes.</p></div></div>
+            <div class="stack">
+            {% for entry in waitlist_entries %}
+                <article class="booking-main"><span class="booking-icon"><i data-lucide="list-clock"></i></span><div><h3>{{ entry.resource.name }}</h3><p>{{ entry.start_time|date:"d/m/Y, H:i" }}</p><span class="badge">{{ entry.get_status_display }}</span></div></article>
+            {% empty %}<div class="empty-state"><i data-lucide="list-minus"></i><p>No estás en ninguna lista.</p></div>{% endfor %}
+            </div>
+        </section>
+        <section class="card">
+            <div class="section-header"><div><h2>Notificaciones</h2><p>Novedades sobre tus horarios.</p></div></div>
+            <div class="stack">
+            {% for notification in notifications %}
+                <article class="booking-main"><span class="booking-icon"><i data-lucide="bell-ring"></i></span><div><h3>{{ notification.message }}</h3><p>{{ notification.created_at|date:"d/m/Y, H:i" }}</p>{% if notification.link %}<a href="{{ notification.link }}">Abrir calendario</a>{% endif %}</div></article>
+            {% empty %}<div class="empty-state"><i data-lucide="bell-off"></i><p>No tienes notificaciones.</p></div>{% endfor %}
+            </div>
+        </section>
+    </aside>
+</div>
+{% endblock %}

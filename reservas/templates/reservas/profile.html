@@ -1,46 +1,28 @@
-<!DOCTYPE html>
-<html lang="es">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Mis datos - Gestor de Reservas</title>
-    <style>
-        body { margin: 0; font-family: Arial, sans-serif; background: #f3f4f6; color: #111827; }
-        nav { background: #2563eb; color: white; padding: 16px 24px; display: flex; justify-content: space-between; }
-        nav a { color: white; text-decoration: none; }
-        main { max-width: 620px; margin: 48px auto; background: white; padding: 32px; border-radius: 12px; box-shadow: 0 10px 24px rgba(0,0,0,.08); }
-        h1 { margin-top: 0; }
-        .help { color: #4b5563; line-height: 1.5; }
-        .field { margin: 20px 0; }
-        label { display: block; font-weight: 700; margin-bottom: 8px; }
-        input, select { box-sizing: border-box; width: 100%; padding: 10px 12px; border: 1px solid #9ca3af; border-radius: 6px; }
-        .errors { color: #b91c1c; margin-top: 6px; }
-        .success { background: #dcfce7; color: #166534; padding: 12px; border-radius: 6px; }
-        button { background: #2563eb; color: white; border: 0; border-radius: 6px; padding: 11px 18px; font-weight: 700; cursor: pointer; }
-    </style>
-</head>
-<body>
-    <nav>
-        <strong>Gestor de Reservas</strong>
-        <a href="{% url 'home' %}">Volver a recursos</a>
-    </nav>
-    <main>
-        <h1>Mis datos y preferencias</h1>
-        <p class="help">Estos datos agilizan futuras reservas. El sistema no almacena números de tarjeta ni códigos de seguridad.</p>
-        {% for message in messages %}
-            <p class="success">{{ message }}</p>
+{% extends "base.html" %}
+
+{% block title %}Mis datos | Gestor de reservas{% endblock %}
+
+{% block content %}
+<section class="card form-card">
+    <div class="form-intro">
+        <p class="eyebrow">Preferencias</p>
+        <h1>Mis datos</h1>
+        <p>Completa esta información para agilizar nuevas reservas. No almacenamos números de tarjeta ni códigos de seguridad.</p>
+    </div>
+    <form method="post">
+        {% csrf_token %}
+        {% for field in form %}
+        <div class="field">
+            {{ field.label_tag }}
+            {{ field }}
+            {% if field.help_text %}<span class="helptext">{{ field.help_text }}</span>{% endif %}
+            {{ field.errors }}
+        </div>
         {% endfor %}
-        <form method="post">
-            {% csrf_token %}
-            {% for field in form %}
-            <div class="field">
-                {{ field.label_tag }}
-                {{ field }}
-                {% if field.errors %}<div class="errors">{{ field.errors }}</div>{% endif %}
-            </div>
-            {% endfor %}
-            <button type="submit">Guardar cambios</button>
-        </form>
-    </main>
-</body>
-</html>
+        <div class="form-actions">
+            <button class="btn btn-primary" type="submit"><i data-lucide="save"></i> Guardar cambios</button>
+            <a class="btn btn-secondary" href="{% url 'home' %}"><i data-lucide="arrow-left"></i> Volver</a>
+        </div>
+    </form>
+</section>
+{% endblock %}

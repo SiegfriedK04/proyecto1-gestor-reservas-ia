@@ -1,50 +1,50 @@
-<!DOCTYPE html>
-<html lang="es">
-<head>
-    <meta charset="UTF-8">
-    <title>Gestor de Reservas - Inicio</title>
-    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
-</head>
-<body class="bg-gray-100">
+{% extends "base.html" %}
 
-    <!-- NAVBAR -->
-    <nav class="bg-blue-600 text-white p-4 flex justify-between">
-        <h1 class="text-xl font-bold">Gestor de Reservas</h1>
-        <div>
+{% block title %}Recursos disponibles | Gestor de reservas{% endblock %}
+
+{% block content %}
+<section class="hero">
+    <div>
+        <p class="eyebrow">Reservas centralizadas</p>
+        <h1>Encuentra el espacio adecuado para cada momento.</h1>
+        <p class="lead">Consulta disponibilidad real, reserva en segundos y administra tus próximos horarios desde una experiencia clara.</p>
+        <div class="hero-actions">
             {% if user.is_authenticated %}
-                <span class="mr-4">Hola, {{ user.username }}</span>
-                {% if user.is_staff %}<a href="{% url 'demand_forecast' %}" class="bg-indigo-800 px-3 py-1 rounded mr-2 hover:bg-indigo-900">Previsión</a>{% endif %}
-                <a href="{% url 'my_bookings' %}" class="bg-blue-800 px-3 py-1 rounded mr-2 hover:bg-blue-900">Mis reservas</a>
-                <a href="{% url 'profile' %}" class="bg-white text-blue-700 px-3 py-1 rounded mr-2 hover:bg-blue-50">Mis datos</a>
-                <a href="{% url 'logout' %}" class="bg-red-500 px-3 py-1 rounded hover:bg-red-600">Cerrar Sesión</a>
+            <a class="btn btn-primary" href="#recursos"><i data-lucide="search"></i> Explorar recursos</a>
+            <a class="btn btn-secondary" href="{% url 'my_bookings' %}"><i data-lucide="calendar-clock"></i> Ver mis reservas</a>
             {% else %}
-                <a href="{% url 'login' %}" class="bg-green-500 px-3 py-1 rounded hover:bg-green-600">Iniciar Sesión</a>
+            <a class="btn btn-primary" href="{% url 'register' %}"><i data-lucide="user-plus"></i> Crear una cuenta</a>
+            <a class="btn btn-secondary" href="{% url 'login' %}"><i data-lucide="log-in"></i> Ya tengo una cuenta</a>
             {% endif %}
         </div>
-    </nav>
+    </div>
+    <div class="hero-stat" aria-label="Resumen de la plataforma">
+        <div class="hero-stat-card"><strong>{{ resources|length }}</strong><span>recursos disponibles</span></div>
+        <div class="hero-stat-card"><strong>24 h</strong><span>plazo mínimo para cancelar</span></div>
+        <div class="hero-stat-card"><strong>12</strong><span>semanas de repetición máxima</span></div>
+    </div>
+</section>
 
-    <!-- CONTENIDO -->
-    <div class="max-w-5xl mx-auto mt-8 px-4">
-        <h2 class="text-2xl font-bold text-center mb-6">Elige una pista para ver su calendario</h2>
-
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            {% for resource in resources %}
-            <div class="bg-white rounded-lg shadow-md p-6 text-center transition-transform transform hover:scale-105 hover:shadow-lg">
-                <h3 class="text-lg font-semibold mb-2">{{ resource.name }}</h3>
-                {% if resource.id == preferred_resource_id %}
-                <span class="inline-block mb-3 px-2 py-1 text-xs font-semibold rounded bg-amber-100 text-amber-800">Preferido</span>
-                {% endif %}
-                <p class="text-gray-600 mb-4">{{ resource.description|default:"Pista disponible." }}</p>
-                <a href="{% url 'calendario_full' resource.id %}" 
-                   class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 transition-colors duration-300">
-                    Ver Calendario
-                </a>
-            </div>
-            {% empty %}
-            <p class="col-span-full text-center text-gray-500">No hay pistas disponibles.</p>
-            {% endfor %}
+<section class="section" id="recursos">
+    <div class="section-header">
+        <div>
+            <p class="eyebrow">Disponibilidad</p>
+            <h2>Selecciona un recurso</h2>
+            <p>Abre el calendario para consultar horarios libres, ocupados y bloqueados.</p>
         </div>
     </div>
-
-</body>
-</html>
+    <div class="resource-grid">
+        {% for resource in resources %}
+        <article class="resource-card">
+            <div class="resource-icon"><i data-lucide="{% cycle 'calendar-days' 'door-open' 'dumbbell' 'presentation' %}"></i></div>
+            {% if resource.id == preferred_resource_id %}<span class="badge"><i data-lucide="star"></i> Recurso preferido</span>{% endif %}
+            <h3>{{ resource.name }}</h3>
+            <p>{{ resource.description|default:"Recurso disponible para reservas." }}</p>
+            <a class="btn btn-primary" href="{% url 'calendario_full' resource.id %}"><i data-lucide="calendar-search"></i> Consultar calendario</a>
+        </article>
+        {% empty %}
+        <div class="empty-state"><i data-lucide="calendar-x"></i><p>No hay recursos configurados todavía.</p></div>
+        {% endfor %}
+    </div>
+</section>
+{% endblock %}
