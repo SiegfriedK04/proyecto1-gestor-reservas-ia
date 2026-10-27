@@ -2,23 +2,23 @@
 
 Rol inicial: QA.
 
-## Actividades que puede realizar sin acceso a GitHub
+## Actividades de validación final
 
 - [ ] Ejecutar la instalación siguiendo el README.
 - [ ] Confirmar que las migraciones funcionan desde una base vacía.
 - [ ] Probar inicio y cierre de sesión.
 - [ ] Intentar crear reservas solapadas.
 - [ ] Probar bloqueos administrativos.
-- [ ] Validar reservas recurrentes y documentar reservas parciales si ocurre un conflicto.
+- [ ] Validar que una recurrencia con conflicto no cree reservas parciales.
 - [ ] Revisar los criterios de aceptación de las cinco historias.
 - [ ] Guardar capturas y resultados con fecha.
 
-## Evidencia que se incorporará después
+## Evidencia que se incorporará al cierre
 
-- Usuario de GitHub: pendiente.
-- Issue de QA asignado: pendiente.
-- Primer comentario de revisión: pendiente.
-- Primer commit o prueba automatizada: pendiente.
+- Resultado de cada caso con fecha.
+- Capturas de los flujos principales.
+- Comentario de revisión técnica.
+- Al menos una contribución propia de prueba o documentación.
 
-Cuando David obtenga acceso, su primera contribución será convertir al menos uno de sus casos manuales en una prueba automatizada mediante una rama propia y Pull Request.
+La contribución final convertirá al menos uno de los casos manuales en una prueba automatizada mediante una rama y un Pull Request propios.
 

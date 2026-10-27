@@ -6,7 +6,7 @@
 |---|---|---|
 | Gabriel Rodriguez | Developer de fundación | Developer de previsión de demanda |
 | Carlos Jaen | Reviewer de fundación | Developer de datos guardados y gestión de reservas |
-| David Ortega | QA de fundación | Developer de una historia al obtener acceso a GitHub |
+| David Ortega | QA de fundación | Validación final y contribución de calidad |
 
 ## Historias del producto
 
@@ -31,5 +31,9 @@ Cada historia requiere issue, rama, commits identificables, pruebas automatizada
 | Gestión de reservas | Carlos | David | Gabriel |
 | Lista de espera | David | Gabriel | Carlos |
 
-La asignación de David permanece reservada. Si su acceso tarda, continuará produciendo casos de prueba y resultados de QA; sus cambios se publicarán con su propia cuenta cuando esté disponible.
+La validación final de David permanece reservada como una contribución independiente de QA sobre la aplicación completa.
+
+## Estado funcional
+
+Las cinco historias del producto y la estabilización técnica se encuentran implementadas e integradas en `main`. El cierre restante corresponde a la ejecución y documentación del plan de QA reservado.
 

@@ -16,9 +16,7 @@ Como cliente, quiero distinguir los días y horarios disponibles, ocupados y blo
 - [ ] El calendario se actualiza sin recargar la página.
 - [ ] Existen pruebas del JSON, permisos y conflictos.
 
-## Roles reservados
+## Estado
 
-- Developer: David Ortega, cuando obtenga acceso.
-- Reviewer: Gabriel Rodriguez.
-- QA: Carlos Jaen.
+Implementación completada. La validación final de QA permanece reservada.
 
