@@ -2,7 +2,7 @@ import json
 from datetime import datetime, timedelta, time
 from django.shortcuts import render, get_object_or_404, redirect
 from django.http import JsonResponse
-from django.views.decorators.csrf import csrf_exempt
+from django.views.decorators.csrf import ensure_csrf_cookie
 from django.utils.dateformat import format as date_format
 from django.utils.dateparse import parse_datetime
 from django.contrib.auth import authenticate, login, logout
@@ -84,6 +84,7 @@ def calendario_navegable(request, resource_id):
     })
 
 
+@ensure_csrf_cookie
 def calendario_full(request, resource_id):
     """
     Calendario interactivo con FullCalendar.
@@ -129,53 +130,82 @@ def calendario_full(request, resource_id):
 
 
 
-@csrf_exempt
+@require_POST
 def api_crear_reserva(request):
     """
     Endpoint para crear una nueva reserva, con soporte para repeticiones semanales.
     """
-    if request.method == 'POST':
-        if not request.user.is_authenticated:
-            return JsonResponse({'success': False, 'error': 'Debes iniciar sesión para reservar.'}, status=403)
+    if not request.user.is_authenticated:
+        return JsonResponse({'success': False, 'error': 'Debes iniciar sesión para reservar.'}, status=403)
+
+    try:
+        data = json.loads(request.body)
+        resource_id = int(data.get('resource_id'))
+        start_time = parse_datetime(data.get('start_time', ''))
+        end_time = parse_datetime(data.get('end_time', ''))
+        repeat_weeks = int(data.get('repeat_weeks', 0))
+    except (TypeError, ValueError, json.JSONDecodeError):
+        return JsonResponse({'success': False, 'error': 'Los datos de la reserva no son válidos.'}, status=400)
+
+    if start_time is None or end_time is None or start_time >= end_time:
+        return JsonResponse({'success': False, 'error': 'El intervalo de la reserva no es válido.'}, status=400)
+    if timezone.is_naive(start_time):
+        start_time = timezone.make_aware(start_time)
+    if timezone.is_naive(end_time):
+        end_time = timezone.make_aware(end_time)
+    if start_time <= timezone.now():
+        return JsonResponse({'success': False, 'error': 'La reserva debe comenzar en el futuro.'}, status=400)
+    if repeat_weeks < 0 or repeat_weeks > 12:
+        return JsonResponse({'success': False, 'error': 'La repetición debe estar entre 0 y 12 semanas.'}, status=400)
+
+    occurrences = [
+        (start_time + timedelta(weeks=index), end_time + timedelta(weeks=index))
+        for index in range(repeat_weeks + 1)
+    ]
+
+    with transaction.atomic():
         try:
-            data = json.loads(request.body)
-            resource_id = data.get('resource_id')
-            start_time = parse_datetime(data.get('start_time'))
-            end_time = parse_datetime(data.get('end_time'))
-            repeat_weeks = int(data.get('repeat_weeks', 0))
+            resource = Resource.objects.select_for_update().get(id=resource_id)
+        except Resource.DoesNotExist:
+            return JsonResponse({'success': False, 'error': 'El recurso solicitado no existe.'}, status=404)
 
-            reservas_creadas = []
+        for index, (start, end) in enumerate(occurrences, start=1):
+            if Availability.objects.filter(
+                resource=resource,
+                start_time__lt=end,
+                end_time__gt=start,
+            ).exists():
+                return JsonResponse({
+                    'success': False,
+                    'error': f'La semana {index} coincide con un horario bloqueado.',
+                }, status=409)
+            if Booking.objects.filter(
+                resource=resource,
+                start_time__lt=end,
+                end_time__gt=start,
+            ).exists():
+                return JsonResponse({
+                    'success': False,
+                    'error': f'La semana {index} coincide con una reserva existente.',
+                }, status=409)
 
-            for i in range(repeat_weeks + 1):
-                start = start_time + timedelta(weeks=i)
-                end = end_time + timedelta(weeks=i)
+        bookings = Booking.objects.bulk_create([
+            Booking(
+                user=request.user,
+                resource=resource,
+                start_time=start,
+                end_time=end,
+            )
+            for start, end in occurrences
+        ])
 
-                overlapping = Booking.objects.filter(
-                    resource_id=resource_id,
-                    start_time__lt=end,
-                    end_time__gt=start
-                )
-                if overlapping.exists():
-                    return JsonResponse({
-                        'success': False,
-                        'error': f'Conflicto: hay una reserva en la semana {i + 1} ({start}).'
-                    })
-
-                booking = Booking.objects.create(
-                    user=request.user,
-                    resource_id=resource_id,
-                    start_time=start,
-                    end_time=end
-                )
-                reservas_creadas.append({
-                    'start': start.isoformat(),
-                    'end': end.isoformat()
-                })
-
-            return JsonResponse({'success': True, 'reservas': reservas_creadas})
-        except Exception as e:
-            return JsonResponse({'success': False, 'error': str(e)})
-    return JsonResponse({'success': False, 'error': 'Método no permitido'}, status=405)
+    return JsonResponse({
+        'success': True,
+        'reservas': [
+            {'id': booking.id, 'start': booking.start_time.isoformat(), 'end': booking.end_time.isoformat()}
+            for booking in bookings
+        ],
+    }, status=201)
 
 
 def login_view(request):

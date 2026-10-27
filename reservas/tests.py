@@ -2,11 +2,11 @@ from datetime import datetime, time, timedelta
 
 from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
-from django.test import TestCase
+from django.test import Client, TestCase
 from django.urls import reverse
 from django.utils import timezone
 
-from .models import Booking, BookingCancellation, Resource, UserProfile
+from .models import Availability, Booking, BookingCancellation, Resource, UserProfile
 from .demand import build_demand_forecast
 
 
@@ -71,6 +71,108 @@ class ReservationBaselineTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(len(response.json()), 1)
         self.assertEqual(response.json()[0]["title"], "Reservado por cliente")
+
+
+class ReservationIntegrityTests(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(username="cliente-integridad", password="segura-123")
+        self.resource = Resource.objects.create(name="Sala Segura")
+        self.start = timezone.now() + timedelta(days=10)
+        self.end = self.start + timedelta(hours=1)
+
+    def payload(self, **overrides):
+        data = {
+            "resource_id": self.resource.id,
+            "start_time": self.start.isoformat(),
+            "end_time": self.end.isoformat(),
+            "repeat_weeks": 0,
+        }
+        data.update(overrides)
+        return data
+
+    def test_api_enforces_csrf_for_authenticated_user(self):
+        client = Client(enforce_csrf_checks=True)
+        client.login(username="cliente-integridad", password="segura-123")
+
+        response = client.post(
+            reverse("api_crear_reserva"),
+            data=self.payload(),
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 403)
+        self.assertFalse(Booking.objects.exists())
+
+    def test_calendar_provides_csrf_cookie_and_valid_token_creates_booking(self):
+        client = Client(enforce_csrf_checks=True)
+        client.login(username="cliente-integridad", password="segura-123")
+        client.get(reverse("calendario_full", args=[self.resource.id]))
+        token = client.cookies["csrftoken"].value
+
+        response = client.post(
+            reverse("api_crear_reserva"),
+            data=self.payload(),
+            content_type="application/json",
+            HTTP_X_CSRFTOKEN=token,
+        )
+
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(Booking.objects.count(), 1)
+
+    def test_recurring_booking_is_atomic_when_later_week_conflicts(self):
+        Booking.objects.create(
+            user=self.user,
+            resource=self.resource,
+            start_time=self.start + timedelta(weeks=1),
+            end_time=self.end + timedelta(weeks=1),
+        )
+        self.client.login(username="cliente-integridad", password="segura-123")
+
+        response = self.client.post(
+            reverse("api_crear_reserva"),
+            data=self.payload(repeat_weeks=2),
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 409)
+        self.assertEqual(Booking.objects.count(), 1)
+        self.assertFalse(Booking.objects.filter(start_time=self.start).exists())
+
+    def test_backend_rejects_administratively_blocked_interval(self):
+        Availability.objects.create(
+            resource=self.resource,
+            start_time=self.start - timedelta(minutes=30),
+            end_time=self.end + timedelta(minutes=30),
+        )
+        self.client.login(username="cliente-integridad", password="segura-123")
+
+        response = self.client.post(
+            reverse("api_crear_reserva"),
+            data=self.payload(),
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 409)
+        self.assertFalse(Booking.objects.exists())
+        self.assertIn("bloqueado", response.json()["error"])
+
+    def test_api_rejects_invalid_interval_and_repeat_limit(self):
+        self.client.login(username="cliente-integridad", password="segura-123")
+
+        invalid_interval = self.client.post(
+            reverse("api_crear_reserva"),
+            data=self.payload(end_time=self.start.isoformat()),
+            content_type="application/json",
+        )
+        invalid_repeat = self.client.post(
+            reverse("api_crear_reserva"),
+            data=self.payload(repeat_weeks=13),
+            content_type="application/json",
+        )
+
+        self.assertEqual(invalid_interval.status_code, 400)
+        self.assertEqual(invalid_repeat.status_code, 400)
+        self.assertFalse(Booking.objects.exists())
 
 
 class UserProfileTests(TestCase):
