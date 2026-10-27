@@ -1,7 +1,9 @@
 from datetime import datetime, time, timedelta
+from io import StringIO
 
 from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
+from django.core.management import call_command
 from django.test import Client, TestCase
 from django.urls import reverse
 from django.utils import timezone
@@ -533,3 +535,28 @@ class WaitlistTests(TestCase):
         entry.refresh_from_db()
         self.assertEqual(entry.status, WaitlistEntry.Status.BOOKED)
         self.assertTrue(Booking.objects.filter(user=self.first).exists())
+
+
+class DemoDataCommandTests(TestCase):
+    def test_demo_command_is_idempotent(self):
+        call_command("crear_reservas_demo", stdout=StringIO())
+        call_command("crear_reservas_demo", stdout=StringIO())
+
+        demo_user = User.objects.get(username="demo_user")
+        demo_resource = Resource.objects.get(name="Pista Pádel 1")
+        self.assertEqual(Booking.objects.filter(user=demo_user, resource=demo_resource).count(), 15)
+
+    def test_demo_reset_preserves_unrelated_bookings(self):
+        user = User.objects.create_user(username="real", password="segura-123")
+        resource = Resource.objects.create(name="Sala Real")
+        start = timezone.now() + timedelta(days=2)
+        booking = Booking.objects.create(
+            user=user,
+            resource=resource,
+            start_time=start,
+            end_time=start + timedelta(hours=1),
+        )
+
+        call_command("crear_reservas_demo", reset_demo=True, stdout=StringIO())
+
+        self.assertTrue(Booking.objects.filter(id=booking.id).exists())

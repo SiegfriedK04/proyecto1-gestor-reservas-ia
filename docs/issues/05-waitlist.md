@@ -10,9 +10,7 @@ Como cliente, quiero entrar en una lista de espera cuando un horario esté ocupa
 - [ ] Se registra una notificación dentro de la aplicación.
 - [ ] Existen pruebas de prioridad, duplicados y permisos.
 
-## Roles reservados
+## Estado
 
-- Developer: David Ortega, cuando obtenga acceso.
-- Reviewer: Carlos Jaen.
-- QA: Gabriel Rodriguez.
+Implementación completada. La validación final de QA permanece reservada.
 
