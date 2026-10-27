@@ -79,7 +79,7 @@ h3 { font-size: 1.05rem; }
 .section { margin-top: 38px; }
 .section-header { display: flex; justify-content: space-between; align-items: end; gap: 16px; margin-bottom: 18px; }
 .section-header p { margin: 6px 0 0; color: var(--muted); }
-.resource-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px; }
+.resource-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 18px; }
 .resource-card { min-width: 0; display: flex; flex-direction: column; padding: 24px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-md); box-shadow: var(--shadow-sm); }
 .resource-card:hover { transform: translateY(-2px); border-color: #adc1d2; box-shadow: var(--shadow-md); transition: .2s ease; }
 .resource-icon { width: 44px; height: 44px; display: grid; place-items: center; margin-bottom: 18px; color: var(--teal-600); background: var(--teal-100); border-radius: 12px; }
