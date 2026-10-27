@@ -6,7 +6,7 @@ from django.test import TestCase
 from django.urls import reverse
 from django.utils import timezone
 
-from .models import Booking, Resource, UserProfile
+from .models import Booking, BookingCancellation, Resource, UserProfile
 from .demand import build_demand_forecast
 
 
@@ -185,3 +185,73 @@ class DemandForecastTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.context["weeks"], 52)
         self.assertContains(response, "promedio de reservas de las últimas cuatro semanas")
+
+
+class MyBookingsTests(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(username="carlos", password="segura-123")
+        self.other_user = User.objects.create_user(username="otro", password="segura-456")
+        self.resource = Resource.objects.create(name="Cancha Sur")
+        self.client.login(username="carlos", password="segura-123")
+
+    def create_booking(self, user, hours_from_now):
+        start = timezone.now() + timedelta(hours=hours_from_now)
+        return Booking.objects.create(
+            user=user,
+            resource=self.resource,
+            start_time=start,
+            end_time=start + timedelta(hours=1),
+        )
+
+    def test_page_only_lists_authenticated_users_bookings(self):
+        own = self.create_booking(self.user, 72)
+        other = self.create_booking(self.other_user, 96)
+
+        response = self.client.get(reverse("my_bookings"))
+
+        self.assertContains(response, reverse("cancel_booking", args=[own.id]))
+        self.assertNotContains(response, reverse("cancel_booking", args=[other.id]))
+
+    def test_user_can_cancel_eligible_booking_and_audit_is_kept(self):
+        booking = self.create_booking(self.user, 48)
+
+        response = self.client.post(reverse("cancel_booking", args=[booking.id]))
+
+        self.assertRedirects(response, reverse("my_bookings"))
+        self.assertFalse(Booking.objects.filter(id=booking.id).exists())
+        cancellation = BookingCancellation.objects.get(user=self.user)
+        self.assertEqual(cancellation.resource_name, "Cancha Sur")
+        self.assertEqual(cancellation.start_time, booking.start_time)
+
+    def test_user_cannot_cancel_another_users_booking(self):
+        booking = self.create_booking(self.other_user, 48)
+
+        response = self.client.post(reverse("cancel_booking", args=[booking.id]))
+
+        self.assertEqual(response.status_code, 404)
+        self.assertTrue(Booking.objects.filter(id=booking.id).exists())
+
+    def test_booking_inside_24_hours_cannot_be_cancelled(self):
+        booking = self.create_booking(self.user, 12)
+
+        response = self.client.post(reverse("cancel_booking", args=[booking.id]), follow=True)
+
+        self.assertTrue(Booking.objects.filter(id=booking.id).exists())
+        self.assertFalse(BookingCancellation.objects.exists())
+        self.assertContains(response, "al menos 24 horas de anticipación")
+
+    def test_past_booking_cannot_be_cancelled(self):
+        booking = self.create_booking(self.user, -2)
+
+        response = self.client.post(reverse("cancel_booking", args=[booking.id]))
+
+        self.assertRedirects(response, reverse("my_bookings"))
+        self.assertTrue(Booking.objects.filter(id=booking.id).exists())
+        self.assertFalse(BookingCancellation.objects.exists())
+
+    def test_cancellation_only_accepts_post(self):
+        booking = self.create_booking(self.user, 48)
+
+        response = self.client.get(reverse("cancel_booking", args=[booking.id]))
+
+        self.assertEqual(response.status_code, 405)

@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mis reservas</title>
+    <style>
+        body { margin: 0; font-family: Arial, sans-serif; background: #f3f4f6; color: #111827; }
+        nav { background: #2563eb; color: white; padding: 16px 24px; display: flex; justify-content: space-between; }
+        nav a { color: white; text-decoration: none; }
+        main { max-width: 900px; margin: 36px auto; padding: 0 20px 40px; }
+        .message { padding: 12px; border: 1px solid #9ca3af; background: white; margin: 14px 0; }
+        .booking { background: white; border: 1px solid #d1d5db; padding: 18px; margin: 12px 0; display: flex; justify-content: space-between; gap: 20px; align-items: center; }
+        .booking h3 { margin: 0 0 8px; }
+        .booking p { margin: 4px 0; color: #4b5563; }
+        button { background: #b91c1c; color: white; border: 0; border-radius: 5px; padding: 10px 14px; cursor: pointer; }
+        button[disabled] { background: #9ca3af; cursor: not-allowed; }
+        .past { opacity: .72; }
+    </style>
+</head>
+<body>
+    <nav><strong>Mis reservas</strong><a href="{% url 'home' %}">Volver a recursos</a></nav>
+    <main>
+        <h1>Próximas reservas</h1>
+        <p>La cancelación está disponible hasta 24 horas antes del inicio.</p>
+        {% for message in messages %}<div class="message">{{ message }}</div>{% endfor %}
+        {% for booking in upcoming_bookings %}
+        <article class="booking">
+            <div>
+                <h3>{{ booking.resource.name }}</h3>
+                <p>Inicio: {{ booking.start_time|date:"d/m/Y H:i" }}</p>
+                <p>Fin: {{ booking.end_time|date:"d/m/Y H:i" }}</p>
+            </div>
+            <form method="post" action="{% url 'cancel_booking' booking.id %}" onsubmit="return confirm('¿Confirmas la cancelación de esta reserva?');">
+                {% csrf_token %}
+                {% if booking.start_time >= cancellation_deadline %}
+                <button type="submit">Cancelar reserva</button>
+                {% else %}
+                <button type="button" disabled>Fuera del plazo</button>
+                {% endif %}
+            </form>
+        </article>
+        {% empty %}<p>No tienes reservas próximas.</p>{% endfor %}
+
+        <h2>Reservas anteriores</h2>
+        {% for booking in past_bookings %}
+        <article class="booking past"><div><h3>{{ booking.resource.name }}</h3><p>{{ booking.start_time|date:"d/m/Y H:i" }}</p></div></article>
+        {% empty %}<p>No hay reservas anteriores.</p>{% endfor %}
+    </main>
+</body>
+</html>
