@@ -91,29 +91,6 @@ def calendario_full(request, resource_id):
     """
     resource = get_object_or_404(Resource, id=resource_id)
 
-    reservas = Booking.objects.filter(resource=resource).order_by('start_time')
-    bloqueos = Availability.objects.filter(resource=resource)
-
-    # Lista de reservas
-    reservas_json = [
-        {
-            "start": reserva.start_time.isoformat(),
-            "end": reserva.end_time.isoformat(),
-            "title": f"Reservado por {reserva.user.username}",
-            "color": "#10b981",  # Verde reservas
-        }
-        for reserva in reservas
-    ]
-
-    # Lista de bloqueos (rojo)
-    bloqueos_json = [
-        {
-            "start": bloqueo.start_time.isoformat(),
-            "end": bloqueo.end_time.isoformat(),
-        }
-        for bloqueo in bloqueos
-    ]
-
     default_repeat_weeks = 0
     if request.user.is_authenticated:
         profile = UserProfile.objects.filter(user=request.user).first()
@@ -122,8 +99,7 @@ def calendario_full(request, resource_id):
 
     return render(request, 'reservas/calendario_full.html', {
         'resource': resource,
-        'reservas_json': json.dumps(reservas_json),
-        'bloqueos_json': json.dumps(bloqueos_json),
+        'resources': Resource.objects.order_by('name'),
         'is_authenticated': request.user.is_authenticated,
         'default_repeat_weeks': default_repeat_weeks,
     })
@@ -302,19 +278,38 @@ def cancel_booking(request, booking_id):
 
 def api_reservas(request, resource_id):
     """
-    API que devuelve todas las reservas de un recurso en formato JSON.
+    API que devuelve reservas y bloqueos sin exponer identidades de clientes.
     """
-    reservas = Booking.objects.filter(resource_id=resource_id).order_by('start_time')
-    eventos = [
+    resource = get_object_or_404(Resource, id=resource_id)
+    bookings = Booking.objects.filter(resource=resource).order_by('start_time')
+    blocks = Availability.objects.filter(resource=resource).order_by('start_time')
+    events = [
         {
-            "title": f"Reservado por {reserva.user.username}",
-            "start": reserva.start_time.isoformat(),
-            "end": reserva.end_time.isoformat(),
-            "color": "#10b981",  # Verde
+            "id": f"booking-{booking.id}",
+            "title": "Mi reserva" if request.user == booking.user else "Ocupado",
+            "start": booking.start_time.isoformat(),
+            "end": booking.end_time.isoformat(),
+            "color": "#2563eb",
+            "textColor": "#ffffff",
+            "editable": False,
+            "extendedProps": {"status": "booking", "owned": request.user == booking.user},
         }
-        for reserva in reservas
+        for booking in bookings
     ]
-    return JsonResponse(eventos, safe=False)
+    events.extend([
+        {
+            "id": f"block-{block.id}",
+            "title": "No disponible",
+            "start": block.start_time.isoformat(),
+            "end": block.end_time.isoformat(),
+            "color": "#dc2626",
+            "textColor": "#ffffff",
+            "editable": False,
+            "extendedProps": {"status": "blocked", "owned": False},
+        }
+        for block in blocks
+    ])
+    return JsonResponse(events, safe=False)
 
 def home(request):
     """

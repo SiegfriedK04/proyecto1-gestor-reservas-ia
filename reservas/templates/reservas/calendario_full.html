@@ -25,6 +25,19 @@
             border-radius: 10px;
             box-shadow: 0 4px 6px rgba(0,0,0,0.1);
         }
+        .calendar-tools {
+            max-width: 1000px;
+            margin: 0 auto 16px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 16px;
+            flex-wrap: wrap;
+        }
+        .calendar-tools select { padding: 8px 10px; border: 1px solid #9ca3af; border-radius: 5px; }
+        .legend { display: flex; gap: 16px; flex-wrap: wrap; }
+        .legend span { display: inline-flex; align-items: center; gap: 6px; }
+        .legend i { width: 14px; height: 14px; border-radius: 3px; display: inline-block; }
         #btn-refresh {
             display: block;
             margin: 20px auto;
@@ -112,6 +125,22 @@
 
     <h1>Calendario Interactivo - {{ resource.name }}</h1>
 
+    <section class="calendar-tools" aria-label="Controles y leyenda del calendario">
+        <label for="resource-selector">
+            Recurso:
+            <select id="resource-selector" aria-label="Cambiar recurso">
+                {% for item in resources %}
+                <option value="{% url 'calendario_full' item.id %}" {% if item.id == resource.id %}selected{% endif %}>{{ item.name }}</option>
+                {% endfor %}
+            </select>
+        </label>
+        <div class="legend" aria-label="Estados del calendario">
+            <span><i style="background:#2563eb"></i> Ocupado</span>
+            <span><i style="background:#dc2626"></i> No disponible</span>
+            <span><i style="background:#ffffff; border:1px solid #9ca3af"></i> Disponible</span>
+        </div>
+    </section>
+
     {% if not is_authenticated %}
     <div style="text-align:center; margin-bottom:20px; color:#b91c1c; font-weight:bold;">
         ⚠️ Debes <a href="/login/" style="color:#2563eb; text-decoration:underline;">iniciar sesión</a> para crear una reserva.
@@ -137,38 +166,21 @@
             const userLogged = calendarElement.dataset.userLogged === "True";
             const defaultRepeatWeeks = Number(calendarElement.dataset.defaultRepeatWeeks || 0);
 
-            // Datos de reservas y bloqueos enviados desde Django
-            const reservas = JSON.parse('{{ reservas_json|escapejs }}');
-            const bloqueos = JSON.parse('{{ bloqueos_json|escapejs }}');
-
-            // Verifica si hay bloqueo del admin
-            function isBlocked(start, end) {
-                for (const b of bloqueos) {
-                    const bloqueadoStart = new Date(b.start);
-                    const bloqueadoEnd = new Date(b.end);
-                    if (start < bloqueadoEnd && end > bloqueadoStart) {
-                        return true;
-                    }
-                }
-                return false;
-            }
-
-            // Verifica si ya existe una reserva
-            function isReserved(start, end) {
-                for (const r of reservas) {
-                    const reservaStart = new Date(r.start);
-                    const reservaEnd = new Date(r.end);
-                    if (start < reservaEnd && end > reservaStart) {
-                        return true;
-                    }
-                }
-                return false;
+            function overlappingEvent(start, end) {
+                return calendar.getEvents().find(event => start < event.end && end > event.start);
             }
 
             var calendar = new FullCalendar.Calendar(calendarElement, {
                 initialView: 'timeGridWeek',
                 locale: 'es',
                 selectable: true,
+                selectOverlap: false,
+                nowIndicator: true,
+                headerToolbar: {
+                    left: 'prev,next today',
+                    center: 'title',
+                    right: 'timeGridWeek,timeGridDay'
+                },
                 slotMinTime: "09:00:00", // Horario inicial
                 slotMaxTime: "21:00:00", // Horario final
                 slotDuration: "01:00:00",
@@ -176,13 +188,9 @@
                     const start = new Date(info.startStr);
                     const end = new Date(info.endStr);
 
-                    if (isBlocked(start, end)) {
-                        alert("Esta franja horaria está bloqueada por el administrador.");
-                        return;
-                    }
-
-                    if (isReserved(start, end)) {
-                        alert("Ya existe una reserva en esta franja horaria.");
+                    const unavailable = overlappingEvent(start, end);
+                    if (unavailable) {
+                        alert(`Esta franja no está disponible: ${unavailable.title}.`);
                         return;
                     }
 
@@ -195,20 +203,13 @@
                         crearReserva(info.startStr, info.endStr);
                     }
                 },
-                eventSources: [
-    {
-        url: '/api/reservas/{{ resource.id }}/',
-        method: 'GET',
-        failure: function() {
-            alert('Error cargando eventos!');
-        }
-    },
-    {
-        events: JSON.parse('{{ bloqueos_json|escapejs }}'),
-        color: '#ef4444',  // Bloqueos en rojo
-        textColor: '#fff'  // Texto en blanco
-    }
-]
+                events: {
+                    url: '{% url "api_reservas" resource.id %}',
+                    method: 'GET',
+                    failure: function() {
+                        alert('No fue posible cargar la disponibilidad.');
+                    }
+                }
 
             });
 
@@ -272,6 +273,10 @@
                     calendar.refetchEvents();
                 });
             }
+
+            document.getElementById('resource-selector').addEventListener('change', function() {
+                window.location.href = this.value;
+            });
         });
     </script>
 </body>

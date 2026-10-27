@@ -70,7 +70,7 @@ class ReservationBaselineTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(len(response.json()), 1)
-        self.assertEqual(response.json()[0]["title"], "Reservado por cliente")
+        self.assertEqual(response.json()[0]["title"], "Ocupado")
 
 
 class ReservationIntegrityTests(TestCase):
@@ -102,6 +102,7 @@ class ReservationIntegrityTests(TestCase):
 
         self.assertEqual(response.status_code, 403)
         self.assertFalse(Booking.objects.exists())
+
 
     def test_calendar_provides_csrf_cookie_and_valid_token_creates_booking(self):
         client = Client(enforce_csrf_checks=True)
@@ -173,6 +174,60 @@ class ReservationIntegrityTests(TestCase):
         self.assertEqual(invalid_interval.status_code, 400)
         self.assertEqual(invalid_repeat.status_code, 400)
         self.assertFalse(Booking.objects.exists())
+
+
+class CalendarAvailabilityTests(TestCase):
+    def setUp(self):
+        self.owner = User.objects.create_user(username="propietario", password="segura-123")
+        self.viewer = User.objects.create_user(username="visitante", password="segura-456")
+        self.resource = Resource.objects.create(name="Cancha Calendario")
+        self.start = timezone.now() + timedelta(days=5)
+        self.booking = Booking.objects.create(
+            user=self.owner,
+            resource=self.resource,
+            start_time=self.start,
+            end_time=self.start + timedelta(hours=1),
+        )
+        self.block = Availability.objects.create(
+            resource=self.resource,
+            start_time=self.start + timedelta(hours=2),
+            end_time=self.start + timedelta(hours=3),
+        )
+
+    def test_events_endpoint_combines_bookings_and_blocks(self):
+        response = self.client.get(reverse("api_reservas", args=[self.resource.id]))
+
+        self.assertEqual(response.status_code, 200)
+        events = response.json()
+        self.assertEqual(len(events), 2)
+        self.assertEqual({event["extendedProps"]["status"] for event in events}, {"booking", "blocked"})
+        self.assertEqual({event["color"] for event in events}, {"#2563eb", "#dc2626"})
+
+    def test_event_titles_do_not_expose_other_users(self):
+        self.client.login(username="visitante", password="segura-456")
+
+        response = self.client.get(reverse("api_reservas", args=[self.resource.id]))
+
+        content = response.content.decode()
+        self.assertNotIn("propietario", content)
+        self.assertEqual(response.json()[0]["title"], "Ocupado")
+
+    def test_owner_can_identify_own_booking(self):
+        self.client.login(username="propietario", password="segura-123")
+
+        response = self.client.get(reverse("api_reservas", args=[self.resource.id]))
+
+        booking_event = next(event for event in response.json() if event["extendedProps"]["status"] == "booking")
+        self.assertEqual(booking_event["title"], "Mi reserva")
+        self.assertTrue(booking_event["extendedProps"]["owned"])
+
+    def test_calendar_contains_legend_navigation_and_dynamic_refresh(self):
+        response = self.client.get(reverse("calendario_full", args=[self.resource.id]))
+
+        self.assertContains(response, "Estados del calendario")
+        self.assertContains(response, "resource-selector")
+        self.assertContains(response, "calendar.refetchEvents()")
+        self.assertContains(response, reverse("api_reservas", args=[self.resource.id]))
 
 
 class UserProfileTests(TestCase):
