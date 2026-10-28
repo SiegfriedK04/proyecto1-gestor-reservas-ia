@@ -36,6 +36,21 @@ class ReservationBaselineTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Sala Norte")
 
+    def test_home_filters_resources_by_name(self):
+        Resource.objects.create(name="Cancha Sur", description="Pista")
+
+        response = self.client.get(reverse("home"), {"buscar": "nOrTe"})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Sala Norte")
+        self.assertNotContains(response, "Cancha Sur")
+
+    def test_home_shows_message_when_resource_search_has_no_matches(self):
+        response = self.client.get(reverse("home"), {"buscar": "Auditorio"})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "No se encontraron recursos con ese nombre.")
+
     def test_booking_validation_rejects_overlap(self):
         Booking.objects.create(
             user=self.user,
@@ -129,6 +144,58 @@ class ReservationIntegrityTests(TestCase):
 
         self.assertEqual(response.status_code, 201)
         self.assertEqual(Booking.objects.count(), 1)
+
+    def test_valid_booking_creates_in_app_confirmation(self):
+        self.client.force_login(self.user)
+
+        response = self.client.post(
+            reverse("api_crear_reserva"),
+            data=self.payload(),
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 201)
+        notification = InAppNotification.objects.get(user=self.user)
+        self.assertEqual(notification.message, "Reserva confirmada: 1 horario para Sala Segura.")
+        self.assertEqual(
+            notification.link,
+            reverse("calendario_full", args=[self.resource.id]),
+        )
+
+    def test_rejected_booking_does_not_create_confirmation(self):
+        Booking.objects.create(
+            user=self.user,
+            resource=self.resource,
+            start_time=self.start,
+            end_time=self.end,
+        )
+        self.client.force_login(self.user)
+
+        response = self.client.post(
+            reverse("api_crear_reserva"),
+            data=self.payload(),
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 409)
+        self.assertFalse(InAppNotification.objects.exists())
+
+    def test_recurring_booking_creates_one_grouped_confirmation(self):
+        self.client.force_login(self.user)
+
+        response = self.client.post(
+            reverse("api_crear_reserva"),
+            data=self.payload(repeat_weeks=2),
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(Booking.objects.count(), 3)
+        self.assertEqual(InAppNotification.objects.filter(user=self.user).count(), 1)
+        self.assertEqual(
+            InAppNotification.objects.get(user=self.user).message,
+            "Reservas confirmadas: 3 horarios para Sala Segura.",
+        )
 
     def test_recurring_booking_is_atomic_when_later_week_conflicts(self):
         Booking.objects.create(
