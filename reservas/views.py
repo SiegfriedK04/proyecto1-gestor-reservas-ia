@@ -250,6 +250,19 @@ def my_bookings(request):
 
 @login_required
 @require_POST
+def mark_notification_read(request, notification_id):
+    notification = get_object_or_404(
+        InAppNotification,
+        id=notification_id,
+        user=request.user,
+    )
+    notification.read_at = timezone.now()
+    notification.save(update_fields=("read_at",))
+    return redirect("my_bookings")
+
+
+@login_required
+@require_POST
 def cancel_booking(request, booking_id):
     """Cancela una reserva propia si faltan al menos 24 horas para su inicio."""
     booking = get_object_or_404(

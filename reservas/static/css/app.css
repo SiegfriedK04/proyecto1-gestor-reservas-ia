@@ -153,6 +153,8 @@ h3 { font-size: 1.05rem; }
 .booking-icon { width: 40px; height: 40px; display: grid; place-items: center; color: var(--blue-700); background: #eaf1ff; border-radius: 10px; }
 .booking-icon svg { width: 19px; }
 .muted-card { opacity: .72; }
+.inline-form { margin-top: 10px; }
+.inline-form .btn { min-height: 36px; padding: 7px 11px; font-size: .85rem; }
 .empty-state { padding: 28px; color: var(--muted); background: white; border: 1px dashed #b9c4cd; border-radius: var(--radius-md); text-align: center; }
 .empty-state svg { width: 32px; margin-bottom: 8px; color: #91a0ac; }
 
