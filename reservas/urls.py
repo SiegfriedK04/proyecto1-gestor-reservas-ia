@@ -13,6 +13,7 @@ urlpatterns = [
     path('perfil/', views.profile_view, name='profile'),
     path('administracion/prevision-demanda/', views.demand_forecast, name='demand_forecast'),
     path('mis-reservas/', views.my_bookings, name='my_bookings'),
+    path('mis-reservas/notificaciones/<int:notification_id>/leer/', views.mark_notification_read, name='mark_notification_read'),
     path('mis-reservas/<int:booking_id>/cancelar/', views.cancel_booking, name='cancel_booking'),
     path('api/lista-espera/', views.join_waitlist, name='join_waitlist'),
 

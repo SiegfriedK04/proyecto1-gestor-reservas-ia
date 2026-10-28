@@ -474,6 +474,48 @@ class MyBookingsTests(TestCase):
 
         self.assertEqual(response.status_code, 405)
 
+    def test_user_can_mark_own_notification_as_read(self):
+        notification = InAppNotification.objects.create(
+            user=self.user,
+            message="Reserva confirmada",
+        )
+
+        response = self.client.post(
+            reverse("mark_notification_read", args=[notification.id]),
+        )
+
+        self.assertRedirects(response, reverse("my_bookings"))
+        notification.refresh_from_db()
+        self.assertIsNotNone(notification.read_at)
+
+    def test_user_cannot_mark_another_users_notification_as_read(self):
+        notification = InAppNotification.objects.create(
+            user=self.other_user,
+            message="Aviso privado",
+        )
+
+        response = self.client.post(
+            reverse("mark_notification_read", args=[notification.id]),
+        )
+
+        self.assertEqual(response.status_code, 404)
+        notification.refresh_from_db()
+        self.assertIsNone(notification.read_at)
+
+    def test_get_does_not_mark_notification_as_read(self):
+        notification = InAppNotification.objects.create(
+            user=self.user,
+            message="Aviso pendiente",
+        )
+
+        response = self.client.get(
+            reverse("mark_notification_read", args=[notification.id]),
+        )
+
+        self.assertEqual(response.status_code, 405)
+        notification.refresh_from_db()
+        self.assertIsNone(notification.read_at)
+
 
 class WaitlistTests(TestCase):
     def setUp(self):

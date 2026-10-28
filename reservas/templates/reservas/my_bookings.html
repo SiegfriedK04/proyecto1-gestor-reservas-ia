@@ -57,7 +57,20 @@
             <div class="section-header"><div><h2>Notificaciones</h2><p>Novedades sobre tus horarios.</p></div></div>
             <div class="stack">
             {% for notification in notifications %}
-                <article class="booking-main"><span class="booking-icon"><i data-lucide="bell-ring"></i></span><div><h3>{{ notification.message }}</h3><p>{{ notification.created_at|date:"d/m/Y, H:i" }}</p>{% if notification.link %}<a href="{{ notification.link }}">Abrir calendario</a>{% endif %}</div></article>
+                <article class="booking-main {% if notification.read_at %}muted-card{% endif %}">
+                    <span class="booking-icon"><i data-lucide="bell-ring"></i></span>
+                    <div>
+                        <h3>{{ notification.message }}</h3>
+                        <p>{{ notification.created_at|date:"d/m/Y, H:i" }} · {% if notification.read_at %}Leída{% else %}Pendiente{% endif %}</p>
+                        {% if notification.link %}<a href="{{ notification.link }}">Abrir calendario</a>{% endif %}
+                        {% if not notification.read_at %}
+                        <form method="post" action="{% url 'mark_notification_read' notification.id %}" class="inline-form">
+                            {% csrf_token %}
+                            <button class="btn btn-secondary" type="submit">Marcar como leída</button>
+                        </form>
+                        {% endif %}
+                    </div>
+                </article>
             {% empty %}<div class="empty-state"><i data-lucide="bell-off"></i><p>No tienes notificaciones.</p></div>{% endfor %}
             </div>
         </section>
