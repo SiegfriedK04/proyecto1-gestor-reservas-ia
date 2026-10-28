@@ -371,7 +371,10 @@ def home(request):
     """
     Vista principal que muestra todas las pistas (resources).
     """
-    resources = Resource.objects.all()  # Obtenemos todas las pistas
+    resource_query = request.GET.get("buscar", "").strip()
+    resources = Resource.objects.all()
+    if resource_query:
+        resources = resources.filter(name__icontains=resource_query)
     preferred_resource_id = None
     if request.user.is_authenticated:
         profile = UserProfile.objects.filter(user=request.user).first()
@@ -379,7 +382,7 @@ def home(request):
             preferred_resource_id = profile.preferred_resource_id
     return render(request, 'reservas/home.html', {
         'resources': resources,
+        'resource_query': resource_query,
         'preferred_resource_id': preferred_resource_id,
     })
-
 

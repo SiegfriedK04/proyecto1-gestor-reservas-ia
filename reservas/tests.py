@@ -36,6 +36,21 @@ class ReservationBaselineTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Sala Norte")
 
+    def test_home_filters_resources_by_name(self):
+        Resource.objects.create(name="Cancha Sur", description="Pista")
+
+        response = self.client.get(reverse("home"), {"buscar": "nOrTe"})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Sala Norte")
+        self.assertNotContains(response, "Cancha Sur")
+
+    def test_home_shows_message_when_resource_search_has_no_matches(self):
+        response = self.client.get(reverse("home"), {"buscar": "Auditorio"})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "No se encontraron recursos con ese nombre.")
+
     def test_booking_validation_rejects_overlap(self):
         Booking.objects.create(
             user=self.user,
