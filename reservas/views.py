@@ -139,6 +139,16 @@ def api_crear_reserva(request):
                 start_time=start,
                 end_time=end,
             ).update(status=WaitlistEntry.Status.BOOKED)
+        booking_count = len(bookings)
+        InAppNotification.objects.create(
+            user=request.user,
+            message=(
+                f"Reserva{'s' if booking_count != 1 else ''} confirmada"
+                f"{'s' if booking_count != 1 else ''}: "
+                f"{booking_count} horario{'s' if booking_count != 1 else ''} para {resource.name}."
+            ),
+            link=reverse("calendario_full", args=[resource.id]),
+        )
 
     return JsonResponse({
         'success': True,
