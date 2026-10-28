@@ -626,6 +626,25 @@ class WaitlistTests(TestCase):
         self.assertEqual(response.status_code, 403)
         self.assertFalse(WaitlistEntry.objects.exists())
 
+    def test_waitlist_rejects_past_slot(self):
+        self.client.force_login(self.first)
+        past_start = timezone.now() - timedelta(hours=2)
+        past_end = past_start + timedelta(hours=1)
+
+        response = self.client.post(
+            reverse("join_waitlist"),
+            data={
+                "resource_id": self.resource.id,
+                "start_time": past_start.isoformat(),
+                "end_time": past_end.isoformat(),
+            },
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.json()["error"], "El horario ya pasó.")
+        self.assertFalse(WaitlistEntry.objects.exists())
+
     def test_user_cannot_join_same_slot_twice(self):
         first_response = self.join_as("primero", "segura-456")
         second_response = self.join_as("primero", "segura-456")
