@@ -33,6 +33,14 @@
             <p>Abre el calendario para consultar horarios libres, ocupados y bloqueados.</p>
         </div>
     </div>
+    <form class="resource-search" method="get" role="search">
+        <label for="resource-search">Buscar recurso</label>
+        <div class="resource-search-row">
+            <input id="resource-search" name="buscar" type="search" value="{{ resource_query }}" placeholder="Ej. Sala Norte" />
+            <button class="btn btn-primary" type="submit"><i data-lucide="search"></i> Buscar</button>
+            {% if resource_query %}<a class="btn btn-secondary" href="{% url 'home' %}">Limpiar</a>{% endif %}
+        </div>
+    </form>
     <div class="resource-grid">
         {% for resource in resources %}
         <article class="resource-card">
@@ -43,7 +51,7 @@
             <a class="btn btn-primary" href="{% url 'calendario_full' resource.id %}"><i data-lucide="calendar-search"></i> Consultar calendario</a>
         </article>
         {% empty %}
-        <div class="empty-state"><i data-lucide="calendar-x"></i><p>No hay recursos configurados todavía.</p></div>
+        <div class="empty-state"><i data-lucide="calendar-x"></i><p>No se encontraron recursos con ese nombre.</p></div>
         {% endfor %}
     </div>
 </section>
