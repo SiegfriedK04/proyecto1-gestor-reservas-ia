@@ -41,6 +41,40 @@
 <section class="calendar-card">
     <div id="calendar" data-resource-id="{{ resource.id }}" data-user-logged="{{ is_authenticated }}" data-default-repeat-weeks="{{ default_repeat_weeks }}"></div>
 </section>
+
+<dialog id="booking-dialog" class="booking-dialog" aria-labelledby="booking-dialog-title">
+    <form method="dialog" id="booking-form" class="booking-dialog__form">
+        <div class="booking-dialog__header">
+            <div>
+                <p class="eyebrow">Nueva reserva</p>
+                <h2 id="booking-dialog-title">Elige el horario exacto</h2>
+                <p class="booking-dialog__hint">Ajusta la fecha y las horas antes de confirmar.</p>
+            </div>
+            <button class="btn btn-secondary booking-dialog__close" value="cancel" aria-label="Cerrar">×</button>
+        </div>
+        <div class="form-grid">
+            <div class="field">
+                <label for="booking-start">Inicio</label>
+                <input id="booking-start" type="datetime-local" required>
+            </div>
+            <div class="field">
+                <label for="booking-end">Fin</label>
+                <input id="booking-end" type="datetime-local" required>
+            </div>
+            <div class="field full">
+                <label for="booking-repeat">Repetir semanalmente</label>
+                <select id="booking-repeat">
+                    <option value="0">No repetir</option>
+                    {% for weeks in "123456789012" %}<option value="{{ forloop.counter }}">{{ forloop.counter }} semana{{ forloop.counter|pluralize }}</option>{% endfor %}
+                </select>
+            </div>
+        </div>
+        <div class="form-actions">
+            <button class="btn btn-primary" value="confirm">Confirmar reserva</button>
+            <button class="btn btn-secondary" value="cancel">Cancelar</button>
+        </div>
+    </form>
+</dialog>
 {% endblock %}
 
 {% block scripts %}
@@ -68,8 +102,8 @@ document.addEventListener('DOMContentLoaded', function () {
         slotMaxTime: '21:00:00',
         slotDuration: '01:00:00',
         height: 'auto',
-        buttonText: { today: 'Hoy', week: 'Semana', day: 'Día' },
-        headerToolbar: { left: 'prev,next today', center: 'title', right: 'timeGridWeek,timeGridDay' },
+        buttonText: { today: 'Hoy', month: 'Mes', week: 'Semana', day: 'Día' },
+        headerToolbar: { left: 'prev,next today', center: 'title', right: 'dayGridMonth,timeGridWeek,timeGridDay' },
         events: {
             url: '{% url "api_reservas" resource.id %}',
             method: 'GET',
@@ -80,9 +114,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 alert('Debes ingresar a tu cuenta para crear una reserva.');
                 return;
             }
-            if (confirm(`¿Deseas reservar desde ${info.start.toLocaleString('es-PA')} hasta ${info.end.toLocaleTimeString('es-PA')}?`)) {
-                createBooking(info.startStr, info.endStr);
-            }
+            openBookingDialog(info.start, info.end);
         },
         eventClick: function (info) {
             const status = info.event.extendedProps.status;
@@ -101,12 +133,32 @@ document.addEventListener('DOMContentLoaded', function () {
 
     calendar.render();
 
-    function createBooking(start, end) {
-        let repeat = prompt('¿Cuántas semanas deseas repetir esta reserva? Usa 0 para reservar una sola vez.', String(defaultRepeatWeeks));
-        if (repeat === null) return;
-        repeat = Number.parseInt(repeat, 10);
-        if (!Number.isInteger(repeat) || repeat < 0 || repeat > 12) {
-            alert('Indica un número entre 0 y 12.');
+    const dialog = document.getElementById('booking-dialog');
+    const bookingForm = document.getElementById('booking-form');
+    const startInput = document.getElementById('booking-start');
+    const endInput = document.getElementById('booking-end');
+    const repeatInput = document.getElementById('booking-repeat');
+    repeatInput.value = String(defaultRepeatWeeks);
+
+    function toLocalInputValue(date) {
+        const pad = value => String(value).padStart(2, '0');
+        return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+    }
+
+    function openBookingDialog(start, end) {
+        startInput.value = toLocalInputValue(start);
+        endInput.value = toLocalInputValue(end);
+        if (typeof dialog.showModal === 'function') dialog.showModal();
+        else dialog.setAttribute('open', '');
+    }
+
+    bookingForm.addEventListener('submit', function (event) {
+        event.preventDefault();
+        const start = startInput.value;
+        const end = endInput.value;
+        const repeat = Number.parseInt(repeatInput.value, 10);
+        if (!start || !end || new Date(start) >= new Date(end)) {
+            alert('Selecciona un intervalo válido: la hora final debe ser posterior a la inicial.');
             return;
         }
         fetch('{% url "api_crear_reserva" %}', {
@@ -117,10 +169,10 @@ document.addEventListener('DOMContentLoaded', function () {
         .then(async response => ({ ok: response.ok, data: await response.json() }))
         .then(result => {
             alert(result.ok ? `Reserva creada correctamente. Horarios registrados: ${result.data.reservas.length}.` : (result.data.error || 'No fue posible crear la reserva.'));
-            if (result.ok) calendar.refetchEvents();
+            if (result.ok) { dialog.close(); calendar.refetchEvents(); }
         })
         .catch(() => alert('No fue posible conectar con el servidor.'));
-    }
+    });
 
     function joinWaitlist(start, end) {
         fetch('{% url "join_waitlist" %}', {

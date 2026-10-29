@@ -303,6 +303,9 @@ class CalendarAvailabilityTests(TestCase):
 
         self.assertContains(response, "Estados de disponibilidad")
         self.assertContains(response, "resource-selector")
+        self.assertContains(response, "booking-dialog")
+        self.assertContains(response, "datetime-local")
+        self.assertContains(response, "dayGridMonth,timeGridWeek,timeGridDay")
         self.assertContains(response, "calendar.refetchEvents()")
         self.assertContains(response, reverse("api_reservas", args=[self.resource.id]))
 
